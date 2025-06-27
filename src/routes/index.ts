@@ -1,7 +1,7 @@
 import { FastifyInstance } from "fastify";
-import { authRoutes } from "./auth";
-import { friendsRoutes } from "./friends";
-import { usersRoutes } from "./users";
+import { authRoutes } from "./auth.js";
+import { friendsRoutes } from "./friends/index.js";
+import { usersRoutes } from "./users.js";
 
 export async function apiRoutes(fastify: FastifyInstance) {
   await fastify.register(authRoutes);
