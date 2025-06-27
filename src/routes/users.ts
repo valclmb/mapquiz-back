@@ -1,6 +1,6 @@
 import { FastifyInstance } from "fastify";
 import { prisma } from "../lib/database.js";
-import { generateRandomTag } from "../lib/generateTag";
+import { generateRandomTag } from "../lib/generateTag.js";
 import { requireAuth } from "../middleware/auth.js";
 
 export async function usersRoutes(fastify: FastifyInstance) {
