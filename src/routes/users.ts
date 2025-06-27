@@ -1,7 +1,7 @@
+import { prisma } from "@/lib/database.js";
 import { generateRandomTag } from "@/lib/generateTag";
 import { FastifyInstance } from "fastify";
-import { prisma } from "../lib/database";
-import { requireAuth } from "../middleware/auth";
+import { requireAuth } from "../middleware/auth.js";
 
 export async function usersRoutes(fastify: FastifyInstance) {
   // Route pour générer ou récupérer un tag pour l'utilisateur connecté
