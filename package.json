@@ -4,8 +4,8 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "tsc && npx prisma generate && npx prisma db push --accept-data-loss",
-    "start": "node dist/server.js",
+    "build": "tsc && npx prisma generate",
+    "start": "npx prisma db push --accept-data-loss && node dist/server.js",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
