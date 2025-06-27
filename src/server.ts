@@ -3,7 +3,7 @@ import helmet from "@fastify/helmet";
 import rateLimit from "@fastify/rate-limit";
 import Fastify from "fastify";
 import { prisma } from "./lib/database.js";
-import { apiRoutes } from "./routes";
+import { apiRoutes } from "./routes/index.js";
 
 const fastify = Fastify({
   logger: {
