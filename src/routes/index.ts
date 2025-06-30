@@ -1,6 +1,6 @@
 import { FastifyInstance } from "fastify";
 import { authRoutes } from "./auth.js";
-import { friendsRoutes } from "./friends/index.js";
+import { friendsRoutes } from "./friends.js";
 import { usersRoutes } from "./users.js";
 
 export async function apiRoutes(fastify: FastifyInstance) {

@@ -1,4 +1,5 @@
-export function generateRandomTag(length: number = 6): string {
+// Fonction de génération de tag intégrée
+export const generateRandomTag = (length: number = 8): string => {
   // Caractères autorisés (lettres et chiffres, sans caractères ambigus)
   const characters = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let result = "";
@@ -10,4 +11,4 @@ export function generateRandomTag(length: number = 6): string {
   }
 
   return result;
-}
+};

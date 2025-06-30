@@ -1,9 +1,12 @@
 import cors from "@fastify/cors";
 import helmet from "@fastify/helmet";
 import rateLimit from "@fastify/rate-limit";
+import websocket from "@fastify/websocket";
 import Fastify from "fastify";
 import { prisma } from "./lib/database.js";
+import { handleError } from "./lib/errorHandler.js";
 import { apiRoutes } from "./routes/index.js";
+import { setupWebSocketHandlers } from "./websocket/handlers.js";
 
 const fastify = Fastify({
   logger: {
@@ -21,7 +24,7 @@ await fastify.register(cors, {
     "Authorization",
     "X-Requested-With",
     "Cookie",
-  ], // Ajouter Cookie
+  ],
   credentials: true,
   maxAge: 86400,
 });
@@ -30,14 +33,18 @@ await fastify.register(rateLimit, {
   timeWindow: "1 minute",
 });
 
+// Plugin WebSocket
+await fastify.register(websocket);
+
 // Routes de base
 fastify.get("/", async (request, reply) => {
   return {
     message: "API Fastify + Prisma",
     version: "1.0.0",
     endpoints: {
-      users: "/users",
-      posts: "/posts",
+      api: "/api",
+      websocket: "/ws",
+      health: "/health",
     },
   };
 });
@@ -62,13 +69,12 @@ fastify.get("/health", async (request, reply) => {
 // Enregistrement de toutes les routes API avec préfixe
 await fastify.register(apiRoutes, { prefix: "/api" });
 
+// Configuration des WebSockets
+setupWebSocketHandlers(fastify);
+
 // Gestion des erreurs globales
 fastify.setErrorHandler((error, request, reply) => {
-  fastify.log.error(error);
-  reply.status(500).send({
-    error: "Erreur interne du serveur",
-    message: process.env.NODE_ENV === "development" ? error.message : undefined,
-  });
+  handleError(error, reply, fastify.log);
 });
 
 // Gestion de l'arrêt propre
@@ -84,6 +90,10 @@ const start = async () => {
     const port = process.env.PORT || 3000;
     await fastify.listen({ port: Number(port), host: "0.0.0.0" });
     console.log(`🚀 Serveur démarré sur le port ${port}`);
+    console.log(`🔌 WebSocket disponible sur ws://localhost:${port}/ws`);
+    console.log(
+      `📊 Health check disponible sur http://localhost:${port}/health`
+    );
   } catch (err) {
     fastify.log.error(err);
     process.exit(1);
