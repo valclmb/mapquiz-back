@@ -17,14 +17,14 @@
     "@fastify/rate-limit": "^10.3.0",
     "@fastify/websocket": "^11.1.0",
     "@hono/node-server": "^1.14.4",
-    "@prisma/client": "^5.7.0",
+    "@prisma/client": "^6.10.1",
     "better-auth": "^1.2.10",
     "fastify": "^5.4.0",
     "hono": "^4.8.2"
   },
   "devDependencies": {
     "@types/node": "^24.0.3",
-    "prisma": "^5.7.0",
+    "prisma": "^6.10.1",
     "tsx": "^4.7.1",
     "typescript": "^5.3.3"
   }

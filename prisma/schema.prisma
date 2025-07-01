@@ -27,7 +27,8 @@ model User {
   receivedFriendRequests FriendRequest[] @relation("Receiver")
   friends               Friend[]        @relation("UserFriends")
   friendsOf             Friend[]        @relation("FriendsOfUser")
-
+  gameScores            GameScore[]
+  
   @@unique([email])
   @@map("user")
 }
@@ -103,4 +104,18 @@ model Verification {
   updatedAt  DateTime?
 
   @@map("verification")
+}
+
+model GameScore {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  score       Int
+  totalQuestions Int
+  selectedRegions String[] // Régions sélectionnées pour ce quiz
+  gameMode    String   @default("quiz") // "quiz" ou "training"
+  duration    Int?     // Durée en secondes
+  createdAt   DateTime @default(now())
+
+  @@map("game_score")
 }

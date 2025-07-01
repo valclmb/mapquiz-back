@@ -4,7 +4,7 @@ import { requireAuth } from "../middleware/auth.js";
 
 export async function usersRoutes(fastify: FastifyInstance) {
   fastify.get(
-    "/user/tag",
+    "/tag",
     {
       preHandler: requireAuth,
     },
@@ -12,7 +12,7 @@ export async function usersRoutes(fastify: FastifyInstance) {
   );
 
   fastify.get(
-    "/users/search",
+    "/search",
     {
       preHandler: requireAuth,
     },
