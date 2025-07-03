@@ -13,4 +13,13 @@ export const auth = betterAuth({
       redirectURI: `${process.env.SERVER_URL}/api/auth/callback/google`,
     },
   },
+  advanced: {
+    useSecureCookies: true,
+    defaultCookieAttributes: {
+      httpOnly: true,
+      secure: true,
+      sameSite: "none", // Crucial pour le cross-domain
+    },
+    trustedOrigins: [process.env.BETTER_AUTH_URL],
+  },
 });
