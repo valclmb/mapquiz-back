@@ -2,6 +2,7 @@ import { WebSocket } from "@fastify/websocket";
 import { FastifyInstance } from "fastify";
 import * as WebSocketController from "../controllers/websocketController.js";
 import { auth } from "../lib/auth.js";
+import * as FriendService from "../services/friendService.js";
 import { addConnection, removeConnection } from "./connectionManager.js";
 
 // Types pour les messages WebSocket
@@ -104,7 +105,32 @@ export const setupWebSocketHandlers = (fastify: FastifyInstance) => {
                   userId = session.user.id;
                   (request as any).user = session.user;
 
+                  // Dans la partie authenticate du switch case, après addConnection :
                   addConnection(userId, socket);
+                  // Notifier les amis que l'utilisateur est en ligne
+                  await FriendService.notifyFriendsOfStatusChange(userId, true);
+
+                  // Dans l'événement onclose, après removeConnection :
+                  socket.on("close", (code: number, reason: Buffer) => {
+                    if (userId) {
+                      removeConnection(userId);
+                      // Notifier les amis que l'utilisateur est hors ligne
+                      FriendService.notifyFriendsOfStatusChange(userId, false);
+                    }
+                    console.log(
+                      `WebSocket fermé - Code: ${code}, Raison: ${reason.toString()}`
+                    );
+                  });
+
+                  // Également dans l'événement onerror :
+                  socket.on("error", (error: Error) => {
+                    if (userId) {
+                      removeConnection(userId);
+                      // Notifier les amis que l'utilisateur est hors ligne
+                      FriendService.notifyFriendsOfStatusChange(userId, false);
+                    }
+                    console.error("Erreur WebSocket:", error);
+                  });
 
                   socket.send(
                     JSON.stringify({

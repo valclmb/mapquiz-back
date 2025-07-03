@@ -60,3 +60,17 @@ export const searchUsersByTag = async (
     take: 10, // Limiter les résultats
   });
 };
+
+export const updateUserStatus = async (
+  userId: string,
+  isOnline: boolean,
+  lastSeen: string
+) => {
+  return prisma.user.update({
+    where: { id: userId },
+    data: {
+      isOnline,
+      lastSeen,
+    },
+  });
+};
