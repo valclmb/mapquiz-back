@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/database.js";
+import { prisma } from "../lib/database.js";
 import * as FriendModel from "../models/friendModel.js";
 import * as UserModel from "../models/userModel.js";
 import { sendToUser } from "../websocket/connectionManager.js";
