@@ -1,5 +1,5 @@
-import { handleError } from "@/lib/errorHandler.js";
 import { FastifyReply, FastifyRequest } from "fastify";
+import { handleError } from "../lib/errorHandler.js";
 import * as FriendService from "../services/friendService.js";
 
 interface AddFriendRequest {
