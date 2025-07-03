@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/database.js";
+import { prisma } from "../lib/database.js";
 
 export const createLobby = async (
   hostId: string,
