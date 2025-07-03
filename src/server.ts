@@ -17,7 +17,25 @@ const fastify = Fastify({
 // Plugins de sécurité
 await fastify.register(helmet);
 await fastify.register(cors, {
-  origin: process.env.BETTER_AUTH_URL,
+  origin: (origin, cb) => {
+    // Accepter les requêtes sans origine (comme les requêtes de l'API)
+    if (!origin) {
+      cb(null, true);
+      return;
+    }
+
+    // Liste des origines autorisées
+    const allowedOrigins = [process.env.BETTER_AUTH_URL];
+
+    if (allowedOrigins.includes(origin)) {
+      cb(null, true);
+      return;
+    }
+
+    // Log pour le débogage
+    console.log(`Origine refusée: ${origin}`);
+    cb(null, false);
+  },
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   allowedHeaders: [
     "Content-Type",
