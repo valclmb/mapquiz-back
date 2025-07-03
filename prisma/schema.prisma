@@ -29,6 +29,11 @@ model User {
   friendsOf             Friend[]        @relation("FriendsOfUser")
   gameScores            GameScore[]
   
+  // Relations pour le multijoueur
+  hostedLobbies    GameLobby[]     @relation("LobbyHost")
+  lobbyPlayers     LobbyPlayer[]
+  multiplayerResults MultiplayerGameResult[]
+
   @@unique([email])
   @@map("user")
 }
@@ -118,4 +123,47 @@ model GameScore {
   createdAt   DateTime @default(now())
 
   @@map("game_score")
+}
+
+model GameLobby {
+  id            String   @id @default(uuid())
+  name          String?
+  hostId        String
+  host          User     @relation("LobbyHost", fields: [hostId], references: [id], onDelete: Cascade)
+  status        String   @default("waiting") // waiting, playing, finished
+  gameSettings  Json     // Stocke les paramètres du jeu (continents, etc.)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  players       LobbyPlayer[]
+  gameResults   MultiplayerGameResult[]
+
+  @@map("game_lobby")
+}
+
+model LobbyPlayer {
+  id        String   @id @default(uuid())
+  lobbyId   String
+  lobby     GameLobby @relation(fields: [lobbyId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status    String   @default("invited") // invited, joined, ready, playing
+  joinedAt  DateTime @default(now())
+
+  @@unique([lobbyId, userId])
+  @@map("lobby_player")
+}
+
+model MultiplayerGameResult {
+  id          String   @id @default(uuid())
+  lobbyId     String
+  lobby       GameLobby @relation(fields: [lobbyId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  score       Int
+  totalQuestions Int
+  completionTime Int?   // Temps en secondes pour terminer
+  position    Int?     // Position dans le classement
+  createdAt   DateTime @default(now())
+
+  @@map("multiplayer_game_result")
 }

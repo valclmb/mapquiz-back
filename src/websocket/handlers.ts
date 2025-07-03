@@ -188,6 +188,134 @@ export const setupWebSocketHandlers = (fastify: FastifyInstance) => {
               );
               break;
 
+            case "create_lobby":
+              if (!userId) {
+                socket.send(
+                  JSON.stringify({
+                    type: "error",
+                    message: "Authentification requise",
+                  })
+                );
+                return;
+              }
+              result = await WebSocketController.handleCreateLobby(
+                payload,
+                userId
+              );
+              break;
+
+            case "invite_to_lobby":
+              if (!userId) {
+                socket.send(
+                  JSON.stringify({
+                    type: "error",
+                    message: "Authentification requise",
+                  })
+                );
+                return;
+              }
+              result = await WebSocketController.handleInviteToLobby(
+                payload,
+                userId
+              );
+              break;
+
+            case "join_lobby":
+              if (!userId) {
+                socket.send(
+                  JSON.stringify({
+                    type: "error",
+                    message: "Authentification requise",
+                  })
+                );
+                return;
+              }
+              result = await WebSocketController.handleJoinLobby(
+                payload,
+                userId
+              );
+              break;
+
+            case "leave_lobby":
+              if (!userId) {
+                socket.send(
+                  JSON.stringify({
+                    type: "error",
+                    message: "Authentification requise",
+                  })
+                );
+                return;
+              }
+              result = await WebSocketController.handleLeaveLobby(
+                payload,
+                userId
+              );
+              break;
+
+            case "update_lobby_settings":
+              if (!userId) {
+                socket.send(
+                  JSON.stringify({
+                    type: "error",
+                    message: "Authentification requise",
+                  })
+                );
+                return;
+              }
+              result = await WebSocketController.handleUpdateLobbySettings(
+                payload,
+                userId
+              );
+              break;
+
+            case "set_player_ready":
+              if (!userId) {
+                socket.send(
+                  JSON.stringify({
+                    type: "error",
+                    message: "Authentification requise",
+                  })
+                );
+                return;
+              }
+              result = await WebSocketController.handleSetPlayerReady(
+                payload,
+                userId
+              );
+              break;
+
+            case "start_game":
+              if (!userId) {
+                socket.send(
+                  JSON.stringify({
+                    type: "error",
+                    message: "Authentification requise",
+                  })
+                );
+                return;
+              }
+              result = await WebSocketController.handleStartGame(
+                payload,
+                userId
+              );
+              break;
+
+            case "update_game_progress":
+              if (!userId) {
+                socket.send(
+                  JSON.stringify({
+                    type: "error",
+                    message: "Authentification requise",
+                  })
+                );
+                return;
+              }
+              result = await WebSocketController.handleUpdateGameProgress(
+                payload,
+                userId
+              );
+              break;
+
             default:
               socket.send(
                 JSON.stringify({
