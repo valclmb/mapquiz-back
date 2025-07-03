@@ -17,7 +17,7 @@ const fastify = Fastify({
 // Plugins de sécurité
 await fastify.register(helmet);
 await fastify.register(cors, {
-  origin: process.env.BETTER_AUTH_URL,
+  origin: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   allowedHeaders: [
     "Content-Type",
