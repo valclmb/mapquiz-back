@@ -148,3 +148,50 @@ export const saveGameResult = async (
     },
   });
 };
+
+export const saveGameState = async (lobbyId: string, gameState: any) => {
+  return await prisma.gameLobby.update({
+    where: { id: lobbyId },
+    data: {
+      gameState,
+    },
+  });
+};
+
+export const updatePlayerGameData = async (
+  lobbyId: string,
+  userId: string,
+  score: number,
+  progress: number,
+  validatedCountries: string[],
+  incorrectCountries: string[]
+) => {
+  return await prisma.lobbyPlayer.update({
+    where: {
+      lobbyId_userId: {
+        lobbyId,
+        userId,
+      },
+    },
+    data: {
+      score,
+      progress,
+      validatedCountries,
+      incorrectCountries,
+    },
+  });
+};
+
+export const getLobbyWithGameState = async (lobbyId: string) => {
+  return await prisma.gameLobby.findUnique({
+    where: { id: lobbyId },
+    include: {
+      host: true,
+      players: {
+        include: {
+          user: true,
+        },
+      },
+    },
+  });
+};

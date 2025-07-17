@@ -111,3 +111,10 @@ export const removeMutualFriendship = async (
     }),
   ]);
 };
+
+export const findFriendRequestById = async (requestId: string) => {
+  return prisma.friendRequest.findUnique({
+    where: { id: requestId },
+    include: { sender: true },
+  });
+};

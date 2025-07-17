@@ -1,5 +1,5 @@
 import * as FriendService from "../services/friendService.js";
-import * as LobbyService from "../services/lobbyService.js";
+import { LobbyService } from "../services/lobbyService.js";
 
 export const handleSendFriendRequest = async (payload: any, userId: string) => {
   const { receiverTag } = payload;
@@ -66,14 +66,38 @@ export const handleUpdateGameProgress = async (
   payload: any,
   userId: string
 ) => {
-  const { lobbyId, score, progress, answerTime, isConsecutiveCorrect } =
-    payload;
+  const { lobbyId, score, answerTime, isConsecutiveCorrect } = payload;
   return await LobbyService.updateGameProgress(
     userId,
     lobbyId,
     score,
-    progress,
     answerTime,
     isConsecutiveCorrect
   );
+};
+
+export const handleUpdatePlayerProgress = async (
+  payload: any,
+  userId: string
+) => {
+  const {
+    lobbyId,
+    validatedCountries,
+    incorrectCountries,
+    score,
+    totalQuestions,
+  } = payload;
+  return await LobbyService.updatePlayerProgress(
+    userId,
+    lobbyId,
+    validatedCountries,
+    incorrectCountries,
+    score,
+    totalQuestions
+  );
+};
+
+export const handleLeaveGame = async (payload: any, userId: string) => {
+  const { lobbyId } = payload;
+  return await LobbyService.leaveGame(userId, lobbyId);
 };

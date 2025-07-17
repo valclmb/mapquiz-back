@@ -1,235 +1,129 @@
-import * as LobbyModel from "../models/lobbyModel.js";
-import * as UserModel from "../models/userModel.js";
-import { sendToUser } from "../websocket/connectionManager.js";
-import * as LobbyManager from "../websocket/lobbyManager.js";
+import { LobbySettings } from "../types/index.js";
+import { LobbyCreationService } from "./lobby/lobbyCreationService.js";
+import { LobbyGameService } from "./lobby/lobbyGameService.js";
+import { LobbyPlayerService } from "./lobby/lobbyPlayerService.js";
 
-export const createLobby = async (
-  userId: string,
-  name: string,
-  settings: any
-) => {
-  // Récupérer les informations de l'utilisateur pour obtenir son nom
-  const user = await UserModel.findUserById(userId);
-
-  if (!user) {
-    throw new Error("Utilisateur non trouvé");
+/**
+ * Service principal pour la gestion des lobbies
+ * Utilise les services spécialisés pour chaque aspect
+ */
+export class LobbyService {
+  /**
+   * Crée un nouveau lobby
+   */
+  static async createLobby(
+    userId: string,
+    name: string,
+    settings: LobbySettings
+  ) {
+    return await LobbyCreationService.createLobby(userId, name, settings);
   }
 
-  // Créer le lobby dans la base de données
-  const lobby = await LobbyModel.createLobby(userId, name, settings);
-
-  // Créer le lobby en mémoire pour la gestion en temps réel
-  LobbyManager.createLobby(lobby.id, userId, user.name, settings);
-
-  // Ajouter les informations des joueurs dans la réponse
-  return {
-    success: true,
-    lobby,
-    players: [
-      {
-        id: userId,
-        name: user.name,
-        status: "joined", // Changer "host" en "joined"
-      },
-    ],
-    hostId: userId, // Ajouter explicitement l'ID de l'hôte
-    settings,
-  };
-};
-
-export const inviteToLobby = async (
-  hostId: string,
-  lobbyId: string,
-  friendId: string
-) => {
-  // Vérifier que l'utilisateur est bien l'hôte du lobby
-  const lobby = await LobbyModel.getLobby(lobbyId);
-  if (!lobby || lobby.hostId !== hostId) {
-    throw new Error("Non autorisé");
+  /**
+   * Invite un ami dans un lobby
+   */
+  static async inviteToLobby(
+    hostId: string,
+    lobbyId: string,
+    friendId: string
+  ) {
+    return await LobbyPlayerService.inviteToLobby(hostId, lobbyId, friendId);
   }
 
-  // Vérifier si le joueur est déjà dans le lobby
-  const existingPlayer = await LobbyModel.getPlayerInLobby(lobbyId, friendId);
-
-  // Si le joueur n'existe pas déjà, l'ajouter au lobby
-  if (!existingPlayer) {
-    await LobbyModel.addPlayerToLobby(lobbyId, friendId, "invited");
+  /**
+   * Rejoint un lobby
+   */
+  static async joinLobby(userId: string, lobbyId: string) {
+    return await LobbyPlayerService.joinLobby(userId, lobbyId);
   }
 
-  // Envoyer une notification à l'ami (même s'il est déjà invité)
-  sendToUser(friendId, {
-    type: "lobby_invitation",
-    payload: {
+  /**
+   * Quitte un lobby
+   */
+  static async leaveLobby(userId: string, lobbyId: string) {
+    return await LobbyPlayerService.leaveLobby(userId, lobbyId);
+  }
+
+  /**
+   * Met à jour les paramètres du lobby
+   */
+  static async updateLobbySettings(
+    userId: string,
+    lobbyId: string,
+    settings: any
+  ) {
+    return await LobbyGameService.updateLobbySettings(
+      userId,
       lobbyId,
-      hostId,
-      hostName: lobby.host.name,
-      lobbyName: lobby.name,
-    },
-  });
-
-  return { success: true, message: "Invitation envoyée" };
-};
-
-export const joinLobby = async (userId: string, lobbyId: string) => {
-  // Vérifier que le lobby existe et que l'utilisateur est invité
-  const player = await LobbyModel.getPlayerInLobby(lobbyId, userId);
-  if (!player) {
-    throw new Error("Invitation non trouvée");
+      settings
+    );
   }
 
-  // Récupérer les informations de l'utilisateur pour obtenir son nom
-  const user = await UserModel.findUserById(userId);
-
-  if (!user) {
-    throw new Error("Utilisateur non trouvé");
+  /**
+   * Met à jour le statut de préparation d'un joueur
+   */
+  static async setPlayerReady(userId: string, lobbyId: string, ready: boolean) {
+    return await LobbyPlayerService.setPlayerReady(userId, lobbyId, ready);
   }
 
-  // Mettre à jour le statut du joueur dans la base de données
-  await LobbyModel.updatePlayerStatus(lobbyId, userId, "joined");
-
-  // Ajouter le joueur au lobby en mémoire avec son nom
-  LobbyManager.addPlayerToLobby(lobbyId, userId, user.name);
-
-  // Récupérer les joueurs du lobby pour les renvoyer
-  const players = await LobbyModel.getLobbyPlayers(lobbyId);
-  const lobby = await LobbyModel.getLobby(lobbyId);
-
-  return {
-    success: true,
-    message: "Lobby rejoint",
-    lobby: {
-      id: lobbyId,
-      name: lobby?.name,
-    },
-    hostId: lobby?.hostId, // Ajouter l'ID de l'hôte
-    players: players.map((p) => ({
-      id: p.userId,
-      name: p.user.name,
-      status: p.status,
-    })),
-    settings: lobby?.gameSettings,
-  };
-};
-
-export const leaveLobby = async (userId: string, lobbyId: string) => {
-  // Supprimer le joueur du lobby dans la base de données
-  await LobbyModel.removePlayerFromLobby(lobbyId, userId);
-
-  // Supprimer le joueur du lobby en mémoire
-  LobbyManager.removePlayerFromLobby(lobbyId, userId);
-
-  // Si c'était l'hôte, supprimer le lobby
-  const lobby = await LobbyModel.getLobby(lobbyId);
-  if (lobby && lobby.hostId === userId) {
-    await LobbyModel.deleteLobby(lobbyId);
-    LobbyManager.removeLobby(lobbyId);
+  /**
+   * Démarre une partie
+   */
+  static async startGame(userId: string, lobbyId: string) {
+    return await LobbyGameService.startGame(userId, lobbyId);
   }
 
-  return { success: true, message: "Lobby quitté" };
-};
-
-export const updateLobbySettings = async (
-  userId: string,
-  lobbyId: string,
-  settings: any
-) => {
-  // Vérifier que l'utilisateur est bien l'hôte du lobby
-  const lobby = await LobbyModel.getLobby(lobbyId);
-  if (!lobby || lobby.hostId !== userId) {
-    throw new Error("Non autorisé");
+  /**
+   * Met à jour la progression du jeu
+   */
+  static async updateGameProgress(
+    userId: string,
+    lobbyId: string,
+    score: number,
+    answerTime?: number,
+    isConsecutiveCorrect?: boolean
+  ) {
+    return await LobbyGameService.updateGameProgress(
+      userId,
+      lobbyId,
+      score,
+      answerTime,
+      isConsecutiveCorrect
+    );
   }
 
-  // Mettre à jour les paramètres du lobby dans la base de données
-  await LobbyModel.updateLobbySettings(lobbyId, settings);
-
-  return { success: true, message: "Paramètres mis à jour" };
-};
-
-export const setPlayerReady = async (
-  userId: string,
-  lobbyId: string,
-  ready: boolean
-) => {
-  // Vérifier que le joueur est bien dans le lobby
-  const player = await LobbyModel.getPlayerInLobby(lobbyId, userId);
-  if (!player) {
-    throw new Error("Joueur non trouvé dans le lobby");
+  /**
+   * Met à jour la progression détaillée du joueur
+   */
+  static async updatePlayerProgress(
+    userId: string,
+    lobbyId: string,
+    validatedCountries: string[],
+    incorrectCountries: string[],
+    score: number,
+    totalQuestions: number
+  ) {
+    return await LobbyGameService.updatePlayerProgress(
+      userId,
+      lobbyId,
+      validatedCountries,
+      incorrectCountries,
+      score,
+      totalQuestions
+    );
   }
 
-  // Mettre à jour le statut du joueur dans la base de données
-  const status = ready ? "ready" : "joined";
-  await LobbyModel.updatePlayerStatus(lobbyId, userId, status);
-
-  // Mettre à jour le statut du joueur en mémoire
-  LobbyManager.updatePlayerStatus(lobbyId, userId, status);
-
-  return {
-    success: true,
-    message: ready ? "Prêt" : "Pas prêt",
-  };
-};
-
-export const startGame = async (userId: string, lobbyId: string) => {
-  // Vérifier que l'utilisateur est bien l'hôte du lobby
-  const lobby = await LobbyModel.getLobby(lobbyId);
-  if (!lobby || lobby.hostId !== userId) {
-    throw new Error("Non autorisé");
+  /**
+   * Récupère l'état du jeu
+   */
+  static async getGameState(lobbyId: string, userId: string) {
+    return await LobbyGameService.getGameState(lobbyId, userId);
   }
 
-  // Vérifier que tous les joueurs sont prêts
-  const players = await LobbyModel.getLobbyPlayers(lobbyId);
-  const allReady = players.every(
-    (p) => p.status === "ready" || p.userId === userId // L'hôte est toujours considéré comme prêt
-  );
-  if (!allReady) {
-    throw new Error("Tous les joueurs ne sont pas prêts");
+  /**
+   * Quitte une partie en cours
+   */
+  static async leaveGame(userId: string, lobbyId: string) {
+    return await LobbyGameService.leaveGame(userId, lobbyId);
   }
-
-  // Mettre à jour le statut du lobby dans la base de données
-  await LobbyModel.updateLobbyStatus(lobbyId, "playing");
-
-  // Démarrer la partie en mémoire
-  LobbyManager.updatePlayerStatus(lobbyId, userId, "ready");
-
-  return { success: true, message: "Partie démarrée" };
-};
-
-export const updateGameProgress = async (
-  userId: string,
-  lobbyId: string,
-  score: number,
-  progress: number,
-  answerTime?: number,
-  isConsecutiveCorrect?: boolean
-) => {
-  // Vérifier que le joueur est bien dans le lobby
-  const player = await LobbyModel.getPlayerInLobby(lobbyId, userId);
-  if (!player) {
-    throw new Error("Joueur non trouvé dans le lobby");
-  }
-
-  // Mettre à jour le score et la progression en mémoire
-  LobbyManager.updatePlayerScore(
-    lobbyId,
-    userId,
-    score,
-    progress,
-    answerTime,
-    isConsecutiveCorrect
-  );
-
-  // Si le joueur a terminé, enregistrer son résultat
-  if (progress >= 100) {
-    const lobby = await LobbyModel.getLobby(lobbyId);
-    if (lobby && lobby.gameSettings && typeof lobby.gameSettings === "object") {
-      const totalQuestions =
-        "totalQuestions" in lobby.gameSettings
-          ? (lobby.gameSettings.totalQuestions as number)
-          : 0;
-
-      await LobbyModel.saveGameResult(lobbyId, userId, score, totalQuestions);
-    }
-  }
-
-  return { success: true };
-};
+}

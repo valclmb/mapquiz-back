@@ -3,38 +3,40 @@ import helmet from "@fastify/helmet";
 import rateLimit from "@fastify/rate-limit";
 import websocket from "@fastify/websocket";
 import Fastify from "fastify";
+import { config } from "./lib/config.js";
 import { prisma } from "./lib/database.js";
-import { handleError } from "./lib/errorHandler.js";
+import { errorHandler } from "./lib/errorHandler.js";
 import { apiRoutes } from "./routes/index.js";
-import { setupWebSocketHandlers } from "./websocket/handlers.js";
+import { setupWebSocketHandlers } from "./websocket/index.js";
 
+/**
+ * Configuration du serveur Fastify
+ */
 const fastify = Fastify({
   logger: {
     level: "info",
   },
 });
 
-// Plugins de sécurité
-await fastify.register(helmet);
-await fastify.register(cors, {
-  origin: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-  allowedHeaders: [
-    "Content-Type",
-    "Authorization",
-    "X-Requested-With",
-    "Cookie",
-  ],
-  credentials: true,
-  maxAge: 86400,
-});
-await fastify.register(rateLimit, {
-  max: 100,
-  timeWindow: "1 minute",
-});
+/**
+ * Configuration des plugins de sécurité et middleware
+ */
+async function setupPlugins() {
+  // Plugin de sécurité Helmet
+  await fastify.register(helmet);
 
-// Plugin WebSocket
-await fastify.register(websocket);
+  // Configuration CORS
+  await fastify.register(cors, config.cors);
+
+  // Limitation de débit
+  await fastify.register(rateLimit, config.rateLimit);
+
+  // Plugin WebSocket
+  await fastify.register(websocket);
+}
+
+// Configuration des plugins de sécurité et middleware
+await setupPlugins();
 
 // Routes de base
 fastify.get("/", async (request, reply) => {
@@ -73,9 +75,7 @@ await fastify.register(apiRoutes, { prefix: "/api" });
 setupWebSocketHandlers(fastify);
 
 // Gestion des erreurs globales
-fastify.setErrorHandler((error, request, reply) => {
-  handleError(error, reply, fastify.log);
-});
+fastify.setErrorHandler(errorHandler);
 
 // Gestion de l'arrêt propre
 process.on("SIGINT", async () => {
