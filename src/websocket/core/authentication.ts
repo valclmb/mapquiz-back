@@ -111,11 +111,13 @@ export function sendErrorResponse(
 export function sendSuccessResponse(
   socket: WebSocket,
   data: any,
-  type: string
+  type: string,
+  lobbyId?: string
 ): void {
   const response: WebSocketResponse = {
     type,
     data,
+    ...(lobbyId && { lobbyId }),
   };
   socket.send(JSON.stringify(response));
 }

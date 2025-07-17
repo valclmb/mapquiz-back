@@ -117,9 +117,12 @@ export class BroadcastManager {
     };
 
     // Envoyer à tous les joueurs du lobby
-    // Note: On devrait récupérer la liste des joueurs depuis le lobby
-    // Pour simplifier, on envoie à tous les utilisateurs connectés
-    // Dans une implémentation complète, il faudrait gérer cela différemment
+    const lobby = getLobbyInMemory(lobbyId);
+    if (lobby) {
+      for (const [playerId] of lobby.players) {
+        sendToUser(playerId, message);
+      }
+    }
   }
 
   /**

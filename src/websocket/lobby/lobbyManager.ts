@@ -204,12 +204,10 @@ export function updatePlayerScore(
   lobby.players.set(playerId, updatedPlayer);
 
   // Vérifier si le joueur a terminé la partie
-  if (
-    GameStateManager.checkGameCompletion(
-      updatedPlayer,
-      lobby.settings.totalQuestions
-    )
-  ) {
+  if (updatedPlayer.progress >= 100) {
+    console.log(
+      `Joueur ${playerId} a terminé avec ${updatedPlayer.progress}% de progression`
+    );
     checkGameCompletion(lobbyId, playerId);
   }
 
@@ -241,12 +239,10 @@ export function updatePlayerProgress(
   lobby.players.set(playerId, updatedPlayer);
 
   // Vérifier si le joueur a terminé la partie
-  if (
-    GameStateManager.checkGameCompletion(
-      updatedPlayer,
-      lobby.settings.totalQuestions
-    )
-  ) {
+  if (updatedPlayer.progress >= 100) {
+    console.log(
+      `LobbyManager.updatePlayerProgress - Joueur ${playerId} a terminé avec ${updatedPlayer.progress}% de progression`
+    );
     checkGameCompletion(lobbyId, playerId);
   }
 
@@ -256,25 +252,47 @@ export function updatePlayerProgress(
 
 // Vérifier si la partie est terminée
 function checkGameCompletion(lobbyId: string, playerId: string) {
+  console.log(
+    `LobbyManager.checkGameCompletion - Début pour lobbyId: ${lobbyId}, playerId: ${playerId}`
+  );
+
   const lobby = activeLobbies.get(lobbyId);
-  if (!lobby) return;
+  if (!lobby) {
+    console.log(
+      `LobbyManager.checkGameCompletion - Lobby ${lobbyId} non trouvé`
+    );
+    return;
+  }
 
   // Marquer le joueur comme ayant terminé
   const playerData = lobby.players.get(playerId);
   if (playerData) {
     lobby.players.set(playerId, { ...playerData, status: "finished" });
+    console.log(
+      `LobbyManager.checkGameCompletion - Joueur ${playerId} marqué comme finished`
+    );
   }
 
   // Vérifier si tous les joueurs ont terminé
   let allFinished = true;
+  const playerStatuses = [];
   for (const [id, data] of lobby.players.entries()) {
+    playerStatuses.push({ id, status: data.status, progress: data.progress });
     if (data.status !== "finished") {
       allFinished = false;
-      break;
     }
   }
 
+  console.log(
+    `LobbyManager.checkGameCompletion - Statuts des joueurs:`,
+    playerStatuses
+  );
+  console.log(
+    `LobbyManager.checkGameCompletion - Tous les joueurs ont terminé: ${allFinished}`
+  );
+
   if (allFinished) {
+    console.log(`LobbyManager.checkGameCompletion - Fin de jeu déclenchée !`);
     endGame(lobbyId);
   }
 }
@@ -287,7 +305,8 @@ function endGame(lobbyId: string) {
   lobby.status = "finished";
   const rankings = GameStateManager.calculateRankings(lobby.players);
 
-  BroadcastManager.broadcastGameEnd(lobbyId, rankings);
+  console.log("LobbyManager.endGame - Fin de jeu, rankings:", rankings);
+  BroadcastManager.broadcastGameResults(lobbyId, rankings);
 }
 
 // Supprimer un lobby
@@ -370,8 +389,10 @@ export function getGameState(lobbyId: string, userId: string) {
     status: lobby.status,
     hostId: lobby.hostId,
     settings: lobby.settings,
-    gameState: lobby.gameState,
-    players,
+    gameState: {
+      ...lobby.gameState,
+      players,
+    },
   };
 }
 

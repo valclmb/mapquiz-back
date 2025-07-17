@@ -147,7 +147,8 @@ export class WebSocketMessageHandler {
 
       // Envoyer la réponse de succès
       if (result) {
-        sendSuccessResponse(socket, result, `${type}_success`);
+        const lobbyId = payload?.lobbyId;
+        sendSuccessResponse(socket, result, `${type}_success`, lobbyId);
       }
     } catch (error) {
       console.error("Erreur lors du traitement du message:", error);

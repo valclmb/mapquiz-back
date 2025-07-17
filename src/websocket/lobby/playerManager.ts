@@ -74,8 +74,19 @@ export class PlayerManager {
   ): PlayerProgress {
     // Calculer la progression basée sur le total des réponses données
     const totalAnswered = validatedCountries.length + incorrectCountries.length;
+
+    // En mode multijoueur, totalQuestions représente les pays actifs (filtrés)
+    // Donc la progression est basée sur les pays actifs, pas tous les pays
     const progress =
       totalQuestions > 0 ? (totalAnswered / totalQuestions) * 100 : 0;
+
+    console.log("PlayerManager.updatePlayerProgress - Calcul progression:", {
+      validatedCountries: validatedCountries.length,
+      incorrectCountries: incorrectCountries.length,
+      totalAnswered,
+      totalQuestions,
+      progress: Math.min(progress, 100),
+    });
 
     return {
       ...player,

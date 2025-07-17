@@ -68,12 +68,19 @@ export class GameStateManager {
     }));
 
     // Trier par score décroissant, puis par progression décroissante
-    return playerArray.sort((a, b) => {
+    const sortedPlayers = playerArray.sort((a, b) => {
       if (b.score !== a.score) {
         return b.score - a.score;
       }
       return b.progress - a.progress;
     });
+
+    // Ajouter le rang à chaque joueur
+    return sortedPlayers.map((player, index) => ({
+      ...player,
+      rank: index + 1, // Rang basé sur la position dans le tableau trié
+      completionTime: null, // Pour l'instant, on n'a pas le temps de completion
+    }));
   }
 
   /**
