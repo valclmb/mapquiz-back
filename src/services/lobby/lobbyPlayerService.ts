@@ -28,16 +28,12 @@ export class LobbyPlayerService {
     // Vérifier si le joueur est déjà dans le lobby
     const existingPlayer = await LobbyModel.getPlayerInLobby(lobbyId, friendId);
 
-    // Si le joueur n'existe pas déjà, l'ajouter au lobby
-    if (!existingPlayer) {
-      await LobbyModel.addPlayerToLobby(
-        lobbyId,
-        friendId,
-        APP_CONSTANTS.PLAYER_STATUS.INVITED
-      );
+    // Si le joueur est déjà dans le lobby, ne pas renvoyer d'invitation
+    if (existingPlayer) {
+      return { success: true, message: "Joueur déjà dans le lobby" };
     }
 
-    // Envoyer une notification à l'ami
+    // Envoyer une notification à l'ami (sans l'ajouter au lobby)
     sendToUser(friendId, {
       type: "lobby_invitation",
       payload: {
@@ -55,11 +51,14 @@ export class LobbyPlayerService {
    * Rejoint un lobby
    */
   static async joinLobby(userId: string, lobbyId: string) {
-    // Vérifier que le lobby existe et que l'utilisateur est invité
-    const player = await LobbyModel.getPlayerInLobby(lobbyId, userId);
-    if (!player) {
-      throw new NotFoundError("Invitation");
+    // Vérifier que le lobby existe
+    const lobby = await LobbyModel.getLobby(lobbyId);
+    if (!lobby) {
+      throw new NotFoundError("Lobby");
     }
+
+    // Vérifier si l'utilisateur est déjà dans le lobby
+    const existingPlayer = await LobbyModel.getPlayerInLobby(lobbyId, userId);
 
     // Récupérer les informations de l'utilisateur
     const user = await UserModel.findUserById(userId);
@@ -67,45 +66,36 @@ export class LobbyPlayerService {
       throw new NotFoundError("Utilisateur");
     }
 
-    // Récupérer les informations du lobby pour vérifier si l'utilisateur est l'host
-    const lobby = await LobbyModel.getLobby(lobbyId);
-    if (!lobby) {
-      throw new NotFoundError("Lobby");
+    // Si l'utilisateur n'est pas déjà dans le lobby, l'ajouter
+    if (!existingPlayer) {
+      await LobbyModel.addPlayerToLobby(
+        lobbyId,
+        userId,
+        APP_CONSTANTS.PLAYER_STATUS.JOINED
+      );
+    } else {
+      // Mettre à jour le statut du joueur dans la base de données
+      await LobbyModel.updatePlayerStatus(
+        lobbyId,
+        userId,
+        APP_CONSTANTS.PLAYER_STATUS.JOINED
+      );
     }
 
-    // Vérifier si l'hôte est seul dans le lobby
-    const lobbyPlayers = await this.getLobbyPlayers(lobbyId);
-    const isAlone = lobbyPlayers.length === 1 && lobby.hostId === userId;
-
-    // Mettre à jour le statut du joueur dans la base de données
-    const status = isAlone
-      ? APP_CONSTANTS.PLAYER_STATUS.READY
-      : APP_CONSTANTS.PLAYER_STATUS.JOINED;
-
-    await LobbyModel.updatePlayerStatus(lobbyId, userId, status);
-
-    // S'assurer que l'host est toujours dans le lobby en mémoire
-    if (lobby.hostId === userId) {
-      console.log(
-        `L'utilisateur ${userId} est l'host du lobby ${lobbyId}, ajout/ mise à jour en mémoire`
-      );
-      // Vérifier si l'host est déjà dans le Map des joueurs en vérifiant directement le lobby
-      const lobbyInMemory = LobbyManager.getLobbyInMemory(lobbyId);
-      if (!lobbyInMemory || !lobbyInMemory.players.has(userId)) {
-        // Si l'host n'est pas dans le Map, l'ajouter
-        LobbyManager.addPlayerToLobby(lobbyId, userId, user.name);
-        console.log(`Host ajouté au lobby en mémoire`);
-      } else {
-        // Si l'host est déjà dans le Map, mettre à jour son statut
-        LobbyManager.updatePlayerStatus(lobbyId, userId, status);
-        console.log(`Statut de l'host mis à jour en mémoire`);
-      }
-    } else {
-      console.log(
-        `L'utilisateur ${userId} n'est pas l'host, ajout au lobby en mémoire`
-      );
-      // Ajouter le joueur au lobby en mémoire seulement s'il n'est pas l'host
+    // Ajouter ou mettre à jour le joueur dans le lobby en mémoire
+    const lobbyInMemory = LobbyManager.getLobbyInMemory(lobbyId);
+    if (!lobbyInMemory || !lobbyInMemory.players.has(userId)) {
+      // Si le joueur n'est pas dans le Map, l'ajouter
       LobbyManager.addPlayerToLobby(lobbyId, userId, user.name);
+      console.log(`Joueur ${userId} ajouté au lobby en mémoire`);
+    } else {
+      // Si le joueur est déjà dans le Map, mettre à jour son statut
+      LobbyManager.updatePlayerStatus(
+        lobbyId,
+        userId,
+        APP_CONSTANTS.PLAYER_STATUS.JOINED
+      );
+      console.log(`Statut du joueur ${userId} mis à jour en mémoire`);
     }
 
     // Récupérer les informations complètes du lobby

@@ -66,12 +66,13 @@ export function updatePlayerStatus(
   BroadcastManager.broadcastLobbyUpdate(lobbyId, lobby);
 
   // Si le statut est "ready", vérifier si tous les joueurs sont prêts en base de données
+  // Permettre le démarrage automatique même avec 1 joueur (pour les tests solo)
   if (status === "ready") {
     // Utiliser une IIFE asynchrone pour gérer l'asynchronicité
     (async () => {
       try {
         console.log(
-          `Vérification si tous les joueurs sont prêts pour le lobby ${lobbyId}`
+          `Vérification si tous les joueurs sont prêts pour le lobby ${lobbyId} (${lobby.players.size} joueur${lobby.players.size > 1 ? "s" : ""})`
         );
 
         // Importer le service pour vérifier en base de données

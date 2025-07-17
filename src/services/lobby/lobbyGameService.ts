@@ -49,6 +49,21 @@ export class LobbyGameService {
       APP_CONSTANTS.PLAYER_STATUS.READY
     );
 
+    // Vérifier qu'il y a au moins 1 joueur (permettre les parties solo)
+    const players = await LobbyPlayerService.getLobbyPlayers(lobbyId);
+    console.log(
+      `LobbyGameService.startGame - Nombre de joueurs: ${players.length}`
+    );
+
+    if (players.length < 1) {
+      console.log(
+        `LobbyGameService.startGame - Erreur: il faut au moins 1 joueur pour démarrer`
+      );
+      throw new LobbyError(
+        "Il faut au moins 1 joueur pour démarrer une partie"
+      );
+    }
+
     // Vérifier que tous les joueurs sont prêts
     console.log(
       `LobbyGameService.startGame - Vérification que tous les joueurs sont prêts`
