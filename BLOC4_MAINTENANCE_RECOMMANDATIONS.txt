@@ -1,0 +1,109 @@
+PAGE DE GARDE
+====================
+
+Projet : MapQuiz
+Bloc 4 : Maintenance et recommandations
+Année universitaire : 2024-2025
+Auteur : [À compléter]
+Master 2 [Nom du Master à compléter]
+
+--------------------
+
+SOMMAIRE
+====================
+1. Introduction
+2. Plan de maintenance
+3. Procédures de mise à jour et de supervision
+4. Recommandations pour l’évolution
+5. Livrables attendus
+6. Annexes
+
+--------------------
+
+1. INTRODUCTION
+====================
+
+Ce document présente la stratégie de maintenance et les recommandations pour l’application MapQuiz, dans le cadre du Bloc 4 du Master 2. Il détaille les procédures de diagnostic, de correction, de mise à jour et d’amélioration continue, afin de garantir la pérennité, la sécurité et l’évolutivité du projet. 
+
+
+2. PLAN DE MAINTENANCE
+====================
+
+2.1 Diagnostic et gestion des anomalies
+--------------------
+- Mise en place d’un système de supervision et d’alerte (logs, monitoring, alertes en cas d’erreur critique).
+- Procédures de collecte et d’analyse des anomalies (rapports d’erreurs, feedback utilisateurs).
+
+2.2 Application des correctifs
+--------------------
+- Création d’un plan de correction pour chaque anomalie détectée.
+- Déploiement des correctifs via un processus d’intégration et de déploiement continu (CI/CD).
+- Rédaction d’un rapport expliquant les correctifs apportés.
+
+2.3 Sécurité et mises à jour
+--------------------
+- Surveillance régulière des dépendances et bibliothèques tierces (mises à jour de sécurité).
+- Application rapide des patchs critiques.
+- Vérification de la conformité aux exigences de sécurité (authentification, gestion des accès, protection des données). 
+
+
+3. PROCÉDURES DE MISE À JOUR ET DE SUPERVISION
+====================
+
+3.1 Gestion des versions
+--------------------
+- Établissement d’un journal des versions (release notes) pour chaque mise à jour.
+- Documentation des correctifs et évolutions apportées.
+
+3.2 Supervision et alertes
+--------------------
+- Mise en place d’indicateurs de suivi (disponibilité, performance, erreurs).
+- Configuration d’alertes pour garantir la disponibilité permanente du service.
+
+3.3 Collaboration avec le support
+--------------------
+- Transmission des informations techniques aux équipes de support.
+- Prise en compte des retours utilisateurs pour améliorer le logiciel.
+- Résolution des problèmes complexes en lien avec le support technique. 
+
+
+4. RECOMMANDATIONS POUR L’ÉVOLUTION
+====================
+
+4.1 Axes d’amélioration
+--------------------
+- Prendre en compte les indicateurs de performance et les retours utilisateurs pour prioriser les évolutions.
+- Ajouter de nouveaux modes de jeu ou de nouvelles cartes géographiques.
+- Améliorer l’accessibilité et l’ergonomie de l’interface.
+
+4.2 Évolutivité technique
+--------------------
+- Prévoir la montée en charge (scalabilité) via l’architecture modulaire.
+- Anticiper l’intégration de nouvelles fonctionnalités (API extensible, microservices si besoin).
+
+4.3 Sécurité et conformité
+--------------------
+- Maintenir une veille sur les vulnérabilités des dépendances.
+- Mettre à jour régulièrement les politiques de sécurité et de confidentialité. 
+
+
+5. LIVRABLES ATTENDUS
+====================
+
+- Plan de maintenance détaillé
+- Rapports de tests et de corrections
+- Journal des versions et des correctifs
+- Documentation des procédures de mise à jour
+- Recommandations d’évolution 
+
+
+6. ANNEXES
+====================
+
+- Liens vers le dépôt GitHub du projet MapQuiz : [à compléter]
+- Exemples de rapports de tests ou de corrections (à insérer selon besoin)
+- Schémas de supervision ou d’alertes (à ajouter en fonction de l’outillage)
+
+---
+
+Fin du document Bloc 4. 
