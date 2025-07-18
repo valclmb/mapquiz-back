@@ -7,7 +7,11 @@ const defaultConfig: AppConfig = {
   port: 3000,
   host: "0.0.0.0",
   cors: {
-    origin: ["http://localhost:5173", "http://127.0.0.1:5173"],
+    origin: [
+      "http://localhost:5173",
+      "http://127.0.0.1:5173",
+      "https://frontend-lively-star-6238.fly.dev",
+    ],
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: [
       "Content-Type",

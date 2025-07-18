@@ -42,13 +42,10 @@ export const getCountries = async (
     if (!countriesCache) {
       // Chemin vers le fichier JSON du frontend
       const __dirname = path.dirname(fileURLToPath(import.meta.url));
-      const frontendPath = path.resolve(
-        __dirname,
-        "../../../frontend/data/countries.json"
-      );
+      const backendPath = path.resolve(__dirname, "../../data/countries.json");
 
       // Lire le fichier JSON
-      const countriesData = fs.readFileSync(frontendPath, "utf8");
+      const countriesData = fs.readFileSync(backendPath, "utf8");
       countriesCache = JSON.parse(countriesData) as CountriesData;
     }
 
