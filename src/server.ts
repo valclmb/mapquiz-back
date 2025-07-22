@@ -14,7 +14,8 @@ import { setupWebSocketHandlers } from "./websocket/index.js";
  */
 const fastify = Fastify({
   logger: {
-    level: "info",
+    level: "warn", // ou "error" pour n'avoir que les erreurs
+    // serializers: { req: () => undefined }, // (optionnel) pour ne pas logger les req du tout
   },
 });
 
@@ -73,6 +74,14 @@ await fastify.register(apiRoutes, { prefix: "/api" });
 
 // Configuration des WebSockets
 setupWebSocketHandlers(fastify);
+
+// Pour désactiver les logs Fastify sur les requêtes WebSocket
+fastify.addHook("onRequest", (req, reply, done) => {
+  if (req.url === "/ws") {
+    req.log.info = () => {};
+  }
+  done();
+});
 
 // Gestion des erreurs globales
 fastify.setErrorHandler(errorHandler);

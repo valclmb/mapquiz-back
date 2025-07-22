@@ -2,12 +2,12 @@ const connections = new Map<string, WebSocket>();
 
 export function addConnection(userId: string, socket: WebSocket) {
   connections.set(userId, socket);
-  console.log(`Utilisateur ${userId} connecté via WebSocket`);
+  // console.log(`Utilisateur ${userId} connecté via WebSocket`);
 }
 
 export function removeConnection(userId: string) {
   connections.delete(userId);
-  console.log(`Utilisateur ${userId} déconnecté`);
+  // console.log(`Utilisateur ${userId} déconnecté`);
 }
 
 export function sendToUser(userId: string, message: any): boolean {

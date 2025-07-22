@@ -11,6 +11,13 @@ export class FriendNotificationService {
    */
   static async notifyFriendsOfStatusChange(userId: string, isOnline: boolean) {
     try {
+      // Vérifier le statut actuel
+      const user = await UserModel.findUserById(userId);
+      if (!user) return false;
+      if (user.isOnline === isOnline) {
+        // Pas de changement de statut, ne rien faire
+        return false;
+      }
       // Récupérer tous les amis de l'utilisateur
       const friends = await FriendModel.findUserFriends(userId);
       // Obtenir la date actuelle pour lastSeen

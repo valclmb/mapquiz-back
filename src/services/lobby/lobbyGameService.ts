@@ -245,6 +245,21 @@ export class LobbyGameService {
     // Mettre à jour les paramètres du lobby dans la base de données
     await LobbyModel.updateLobbySettings(lobbyId, settings);
 
+    // --- PATCH: Mettre à jour le lobby en mémoire et diffuser la mise à jour ---
+    const { getLobbyInMemory } = await import(
+      "../../websocket/lobby/lobbyManager.js"
+    );
+    const { BroadcastManager } = await import(
+      "../../websocket/lobby/broadcastManager.js"
+    );
+    console.log("BACKEND - Diffusion lobby_update avec settings :", settings);
+    const lobbyInMemory = getLobbyInMemory(lobbyId);
+    if (lobbyInMemory) {
+      lobbyInMemory.settings = settings;
+      BroadcastManager.broadcastLobbyUpdate(lobbyId, lobbyInMemory); // Diffuse la mise à jour à tous les joueurs
+    }
+    // --- FIN PATCH ---
+
     return { success: true, message: "Paramètres mis à jour" };
   }
 

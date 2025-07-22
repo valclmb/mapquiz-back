@@ -87,7 +87,7 @@ export class LobbyPlayerService {
     if (!lobbyInMemory || !lobbyInMemory.players.has(userId)) {
       // Si le joueur n'est pas dans le Map, l'ajouter
       LobbyManager.addPlayerToLobby(lobbyId, userId, user.name);
-      console.log(`Joueur ${userId} ajouté au lobby en mémoire`);
+      // console.log(`Joueur ${userId} ajouté au lobby en mémoire`);
     } else {
       // Si le joueur est déjà dans le Map, mettre à jour son statut
       LobbyManager.updatePlayerStatus(
@@ -95,7 +95,7 @@ export class LobbyPlayerService {
         userId,
         APP_CONSTANTS.PLAYER_STATUS.JOINED
       );
-      console.log(`Statut du joueur ${userId} mis à jour en mémoire`);
+      // console.log(`Statut du joueur ${userId} mis à jour en mémoire`);
     }
 
     // Récupérer les informations complètes du lobby
@@ -142,61 +142,61 @@ export class LobbyPlayerService {
    * Met à jour le statut de préparation d'un joueur
    */
   static async setPlayerReady(userId: string, lobbyId: string, ready: boolean) {
-    console.log(
-      `setPlayerReady - Début pour userId: ${userId}, lobbyId: ${lobbyId}, ready: ${ready}`
-    );
+    // console.log(
+    //   `setPlayerReady - Début pour userId: ${userId}, lobbyId: ${lobbyId}, ready: ${ready}`
+    // );
 
     // Vérifier que le joueur est bien dans le lobby
     const player = await LobbyModel.getPlayerInLobby(lobbyId, userId);
     if (!player) {
-      console.log(
-        `setPlayerReady - Joueur ${userId} non trouvé dans le lobby ${lobbyId}`
-      );
+      // console.log(
+      //   `setPlayerReady - Joueur ${userId} non trouvé dans le lobby ${lobbyId}`
+      // );
       throw new NotFoundError("Joueur dans le lobby");
     }
 
-    console.log(
-      `setPlayerReady - Joueur trouvé avec statut actuel: ${player.status}`
-    );
+    // console.log(
+    //   `setPlayerReady - Joueur trouvé avec statut actuel: ${player.status}`
+    // );
 
     // Récupérer le lobby pour vérifier si l'utilisateur est l'hôte
     const lobby = await LobbyModel.getLobby(lobbyId);
     const isHost = lobby?.hostId === userId;
     const lobbyPlayers = await this.getLobbyPlayers(lobbyId);
 
-    console.log(
-      `setPlayerReady - isHost: ${isHost}, playersCount: ${lobbyPlayers.length}`
-    );
+    // console.log(
+    //   `setPlayerReady - isHost: ${isHost}, playersCount: ${lobbyPlayers.length}`
+    // );
 
     // Mettre à jour le statut du joueur
     const status = ready
       ? APP_CONSTANTS.PLAYER_STATUS.READY
       : APP_CONSTANTS.PLAYER_STATUS.JOINED;
 
-    console.log(
-      `setPlayerReady - Mise à jour du statut en BDD vers: ${status}`
-    );
+    // console.log(
+    //   `setPlayerReady - Mise à jour du statut en BDD vers: ${status}`
+    // );
     await LobbyModel.updatePlayerStatus(lobbyId, userId, status);
-    console.log(`setPlayerReady - Statut mis à jour en BDD`);
+    // console.log(`setPlayerReady - Statut mis à jour en BDD`);
 
     // Mettre à jour le statut du joueur en mémoire
-    console.log(
-      `setPlayerReady - Mise à jour du statut en mémoire vers: ${status}`
-    );
+    // console.log(
+    //   `setPlayerReady - Mise à jour du statut en mémoire vers: ${status}`
+    // );
     const memoryUpdate = LobbyManager.updatePlayerStatus(
       lobbyId,
       userId,
       status
     );
-    console.log(
-      `setPlayerReady - Résultat de la mise à jour en mémoire: ${memoryUpdate}`
-    );
+    // console.log(
+    //   `setPlayerReady - Résultat de la mise à jour en mémoire: ${memoryUpdate}`
+    // );
 
     // Vérifier le statut après mise à jour
     const updatedPlayer = await LobbyModel.getPlayerInLobby(lobbyId, userId);
-    console.log(
-      `setPlayerReady - Statut après mise à jour: ${updatedPlayer?.status}`
-    );
+    // console.log(
+    //   `setPlayerReady - Statut après mise à jour: ${updatedPlayer?.status}`
+    // );
 
     return {
       success: true,
@@ -222,35 +222,35 @@ export class LobbyPlayerService {
    * Vérifie si un joueur est dans un lobby
    */
   static async verifyPlayerInLobby(userId: string, lobbyId: string) {
-    console.log(
-      `verifyPlayerInLobby - Vérification pour userId: ${userId}, lobbyId: ${lobbyId}`
-    );
+    // console.log(
+    //   `verifyPlayerInLobby - Vérification pour userId: ${userId}, lobbyId: ${lobbyId}`
+    // );
 
     const validatedLobbyId = validateLobbyId(lobbyId);
     const player = await LobbyModel.getPlayerInLobby(validatedLobbyId, userId);
 
     if (!player) {
-      console.log(
-        `verifyPlayerInLobby - Joueur ${userId} non trouvé dans le lobby ${lobbyId}`
-      );
+      // console.log(
+      //   `verifyPlayerInLobby - Joueur ${userId} non trouvé dans le lobby ${lobbyId}`
+      // );
 
       // Récupérer tous les joueurs du lobby pour debug
       const allPlayers = await LobbyModel.getLobbyPlayers(validatedLobbyId);
-      console.log(
-        `verifyPlayerInLobby - Joueurs dans le lobby:`,
-        allPlayers.map((p) => ({
-          id: p.userId,
-          name: p.user.name,
-          status: p.status,
-        }))
-      );
+      // console.log(
+      //   `verifyPlayerInLobby - Joueurs dans le lobby:`,
+      //   allPlayers.map((p) => ({
+      //     id: p.userId,
+      //     name: p.user.name,
+      //     status: p.status,
+      //   }))
+      // );
 
       throw new NotFoundError("Joueur dans le lobby");
     }
 
-    console.log(
-      `verifyPlayerInLobby - Joueur ${userId} trouvé avec statut: ${player.status}`
-    );
+    // console.log(
+    //   `verifyPlayerInLobby - Joueur ${userId} trouvé avec statut: ${player.status}`
+    // );
     return player;
   }
 
@@ -261,27 +261,27 @@ export class LobbyPlayerService {
     lobbyId: string,
     hostId: string
   ): Promise<boolean> {
-    console.log(
-      `areAllPlayersReady - Vérification pour lobby: ${lobbyId}, host: ${hostId}`
-    );
+    // console.log(
+    //   `areAllPlayersReady - Vérification pour lobby: ${lobbyId}, host: ${hostId}`
+    // );
 
     const players = await this.getLobbyPlayers(lobbyId);
-    console.log(
-      `areAllPlayersReady - Joueurs récupérés:`,
-      players.map((p: any) => ({
-        id: p.id,
-        name: p.name || "Unknown",
-        status: p.status,
-      }))
-    );
+    // console.log(
+    //   `areAllPlayersReady - Joueurs récupérés:`,
+    //   players.map((p: any) => ({
+    //     id: p.id,
+    //     name: p.name || "Unknown",
+    //     status: p.status,
+    //   }))
+    // );
 
     // Vérifier que tous les joueurs sont prêts
     const allReady = players.every(
       (p) => p.status === APP_CONSTANTS.PLAYER_STATUS.READY
     );
-    console.log(
-      `areAllPlayersReady - Tous les joueurs sont prêts: ${allReady}`
-    );
+    // console.log(
+    //   `areAllPlayersReady - Tous les joueurs sont prêts: ${allReady}`
+    // );
 
     return allReady;
   }

@@ -12,7 +12,7 @@ export class WebSocketConnectionHandler {
    * Gère l'établissement d'une nouvelle connexion
    */
   static handleNewConnection(socket: WebSocket): void {
-    console.log("Nouvelle connexion WebSocket établie");
+    // console.log("Nouvelle connexion WebSocket établie");
 
     // Confirmer la connexion
     sendSuccessResponse(
@@ -82,9 +82,9 @@ export class WebSocketConnectionHandler {
     // Notifier les amis que l'utilisateur est hors ligne
     await FriendService.notifyFriendsOfStatusChange(userId, false);
 
-    console.log(
-      `WebSocket fermé - Code: ${code}, Raison: ${reason.toString()}`
-    );
+    // console.log(
+    //   `WebSocket fermé - Code: ${code}, Raison: ${reason.toString()}`
+    // );
   }
 
   /**
@@ -99,6 +99,6 @@ export class WebSocketConnectionHandler {
     // Notifier les amis que l'utilisateur est hors ligne
     await FriendService.notifyFriendsOfStatusChange(userId, false);
 
-    console.error("Erreur WebSocket:", error);
+    // console.error("Erreur WebSocket:", error);
   }
 }

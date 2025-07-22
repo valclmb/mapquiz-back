@@ -23,7 +23,7 @@ export const setupWebSocketHandlers = (fastify: FastifyInstance) => {
       socket.on("message", async (message: Buffer) => {
         try {
           const messageString = message.toString();
-          console.log("Message reçu:", messageString);
+          // console.log("Message reçu:", messageString);
 
           const data: WebSocketMessage = JSON.parse(messageString);
           const { type, payload } = data;

@@ -145,11 +145,11 @@ export class FriendRequestService {
     });
 
     if (notificationSent) {
-      console.log(`Notification envoyée à l'utilisateur ${receiverId}`);
+      // console.log(`Notification envoyée à l'utilisateur ${receiverId}`);
     } else {
-      console.log(
-        `Utilisateur ${receiverId} pas connecté - notification ignorée`
-      );
+      // console.log(
+      //   `Utilisateur ${receiverId} pas connecté - notification ignorée`
+      // );
     }
   }
 }

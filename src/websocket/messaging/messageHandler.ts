@@ -184,9 +184,9 @@ export class WebSocketMessageHandler {
       throw new Error("lobbyId requis");
     }
 
-    console.log(
-      `Demande d'état du jeu pour le lobby ${lobbyId} par l'utilisateur ${userId}`
-    );
+    // console.log(
+    //   `Demande d'état du jeu pour le lobby ${lobbyId} par l'utilisateur ${userId}`
+    // );
 
     try {
       // Utiliser directement le service de lobby pour récupérer l'état du jeu
@@ -194,7 +194,7 @@ export class WebSocketMessageHandler {
       const gameState = await LobbyService.getGameState(lobbyId, userId);
 
       if (!gameState) {
-        console.log(`Aucun état de jeu trouvé pour le lobby ${lobbyId}`);
+        // console.log(`Aucun état de jeu trouvé pour le lobby ${lobbyId}`);
         return {
           lobbyId,
           gameState: null,
@@ -202,11 +202,11 @@ export class WebSocketMessageHandler {
         };
       }
 
-      console.log(`État du jeu récupéré avec succès pour le lobby ${lobbyId}`);
-      console.log(
-        "Structure du gameState envoyé:",
-        JSON.stringify(gameState, null, 2)
-      );
+      // console.log(`État du jeu récupéré avec succès pour le lobby ${lobbyId}`);
+      // console.log(
+      //   "Structure du gameState envoyé:",
+      //   JSON.stringify(gameState, null, 2)
+      // );
 
       return {
         lobbyId,
