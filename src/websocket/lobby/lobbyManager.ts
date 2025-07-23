@@ -429,3 +429,37 @@ export function restoreLobbyFromDatabase(lobbyId: string, lobbyData: any) {
 
   console.log(`Lobby ${lobbyId} restauré depuis la base de données`);
 }
+
+// Redémarrer un lobby
+export function restartLobby(lobbyId: string) {
+  console.log(`LobbyManager.restartLobby - Redémarrage du lobby ${lobbyId}`);
+
+  const lobby = activeLobbies.get(lobbyId);
+  if (!lobby) {
+    console.log(`Lobby ${lobbyId} non trouvé en mémoire`);
+    return false;
+  }
+
+  // Réinitialiser le statut du lobby
+  lobby.status = "waiting";
+  lobby.gameState = null;
+
+  // Réinitialiser tous les joueurs
+  for (const [playerId, playerData] of lobby.players) {
+    lobby.players.set(playerId, {
+      ...playerData,
+      status: "not_ready",
+      score: 0,
+      progress: 0,
+      validatedCountries: [],
+      incorrectCountries: [],
+      completionTime: null,
+    });
+  }
+
+  // Diffuser la mise à jour du lobby
+  BroadcastManager.broadcastLobbyUpdate(lobbyId, lobby);
+
+  console.log(`Lobby ${lobbyId} redémarré avec succès`);
+  return true;
+}

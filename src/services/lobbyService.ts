@@ -126,4 +126,18 @@ export class LobbyService {
   static async leaveGame(userId: string, lobbyId: string) {
     return await LobbyGameService.leaveGame(userId, lobbyId);
   }
+
+  /**
+   * Récupère les résultats de la partie
+   */
+  static async getGameResults(lobbyId: string, userId: string) {
+    return await LobbyGameService.getGameResults(lobbyId, userId);
+  }
+
+  /**
+   * Redémarre une partie
+   */
+  static async restartGame(userId: string, lobbyId: string) {
+    return await LobbyGameService.restartGame(userId, lobbyId);
+  }
 }

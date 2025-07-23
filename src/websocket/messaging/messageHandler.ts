@@ -140,6 +140,16 @@ export class WebSocketMessageHandler {
           result = await this.handleGetGameState(payload, userId!);
           break;
 
+        case WS_MESSAGE_TYPES.GET_GAME_RESULTS:
+          if (!this.requireAuth(userId, socket)) return;
+          result = await this.handleGetGameResults(payload, userId!);
+          break;
+
+        case WS_MESSAGE_TYPES.RESTART_GAME:
+          if (!this.requireAuth(userId, socket)) return;
+          result = await this.handleRestartGame(payload, userId!);
+          break;
+
         default:
           sendErrorResponse(socket, `Type de message non supporté: ${type}`);
           return;
@@ -219,6 +229,68 @@ export class WebSocketMessageHandler {
       );
       throw new Error(
         `Impossible de récupérer l'état du jeu: ${error instanceof Error ? error.message : "Erreur inconnue"}`
+      );
+    }
+  }
+
+  /**
+   * Gère la récupération des résultats de jeu
+   */
+  private static async handleGetGameResults(
+    payload: any,
+    userId: string
+  ): Promise<any> {
+    const { lobbyId } = payload;
+    if (!lobbyId) {
+      throw new Error("lobbyId requis");
+    }
+
+    try {
+      const { LobbyService } = await import("../../services/lobbyService.js");
+      const results = await LobbyService.getGameResults(lobbyId, userId);
+
+      return {
+        lobbyId,
+        rankings: results,
+      };
+    } catch (error) {
+      console.error(
+        `Erreur lors de la récupération des résultats pour le lobby ${lobbyId}:`,
+        error
+      );
+      throw new Error(
+        `Impossible de récupérer les résultats: ${error instanceof Error ? error.message : "Erreur inconnue"}`
+      );
+    }
+  }
+
+  /**
+   * Gère le redémarrage d'une partie
+   */
+  private static async handleRestartGame(
+    payload: any,
+    userId: string
+  ): Promise<any> {
+    const { lobbyId } = payload;
+    if (!lobbyId) {
+      throw new Error("lobbyId requis");
+    }
+
+    try {
+      const { LobbyService } = await import("../../services/lobbyService.js");
+      await LobbyService.restartGame(lobbyId, userId);
+
+      return {
+        lobbyId,
+        message: "Partie redémarrée avec succès",
+      };
+    } catch (error) {
+      console.error(
+        `Erreur lors du redémarrage de la partie pour le lobby ${lobbyId}:`,
+        error
+      );
+      throw new Error(
+        `Impossible de redémarrer la partie: ${error instanceof Error ? error.message : "Erreur inconnue"}`
       );
     }
   }

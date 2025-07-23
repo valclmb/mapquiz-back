@@ -452,4 +452,112 @@ export class LobbyGameService {
       throw error;
     }
   }
+
+  /**
+   * Récupère les résultats de la partie
+   */
+  static async getGameResults(lobbyId: string, userId: string) {
+    console.log(
+      `LobbyGameService.getGameResults - Début pour userId: ${userId}, lobbyId: ${lobbyId}`
+    );
+
+    // Vérifier que le joueur est bien dans le lobby
+    await LobbyPlayerService.verifyPlayerInLobby(userId, lobbyId);
+
+    try {
+      const lobby = await LobbyModel.getLobby(lobbyId);
+      if (!lobby) {
+        throw new LobbyError("Lobby non trouvé");
+      }
+
+      // Vérifier que la partie est terminée
+      if (lobby.status !== APP_CONSTANTS.LOBBY_STATUS.FINISHED) {
+        throw new LobbyError("La partie n'est pas encore terminée");
+      }
+
+      // Récupérer les joueurs avec leurs scores
+      const players = await LobbyPlayerService.getLobbyPlayers(lobbyId);
+      
+      // Créer le classement
+      const rankings = players
+        .map((player) => ({
+          id: player.userId,
+          name: player.user.name,
+          score: player.score,
+          rank: 0, // Sera calculé ci-dessous
+          completionTime: player.completionTime || null,
+        }))
+        .sort((a, b) => b.score - a.score); // Tri par score décroissant
+
+      // Assigner les rangs
+      rankings.forEach((player, index) => {
+        player.rank = index + 1;
+      });
+
+      console.log(
+        `LobbyGameService.getGameResults - Résultats récupérés: ${rankings.length} joueurs`
+      );
+
+      return rankings;
+    } catch (error) {
+      console.error(
+        `Erreur lors de la récupération des résultats pour le lobby ${lobbyId}:`,
+        error
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Redémarre une partie
+   */
+  static async restartGame(userId: string, lobbyId: string) {
+    console.log(
+      `LobbyGameService.restartGame - Début pour userId: ${userId}, lobbyId: ${lobbyId}`
+    );
+
+    // Vérifier que l'utilisateur est bien l'hôte du lobby
+    const lobby = await LobbyModel.getLobby(lobbyId);
+    if (!lobby || lobby.hostId !== userId) {
+      throw new LobbyError(APP_CONSTANTS.ERRORS.UNAUTHORIZED);
+    }
+
+    try {
+      // Réinitialiser le statut du lobby
+      await LobbyModel.updateLobbyStatus(
+        lobbyId,
+        APP_CONSTANTS.LOBBY_STATUS.WAITING
+      );
+
+      // Réinitialiser les scores et statuts des joueurs
+      const players = await LobbyPlayerService.getLobbyPlayers(lobbyId);
+      for (const player of players) {
+        await LobbyModel.updatePlayerStatus(
+          lobbyId,
+          player.userId,
+          APP_CONSTANTS.PLAYER_STATUS.NOT_READY
+        );
+        await LobbyModel.updatePlayerScore(lobbyId, player.userId, 0);
+        await LobbyModel.updatePlayerProgress(lobbyId, player.userId, 0);
+        await LobbyModel.updatePlayerValidatedCountries(lobbyId, player.userId, []);
+        await LobbyModel.updatePlayerIncorrectCountries(lobbyId, player.userId, []);
+        await LobbyModel.updatePlayerCompletionTime(lobbyId, player.userId, null);
+      }
+
+      // Réinitialiser l'état du jeu en mémoire
+      LobbyManager.restartLobby(lobbyId);
+
+      console.log(
+        `LobbyGameService.restartGame - Partie redémarrée avec succès pour le lobby ${lobbyId}`
+      );
+
+      return { success: true, message: "Partie redémarrée" };
+    } catch (error) {
+      console.error(
+        `Erreur lors du redémarrage de la partie pour le lobby ${lobbyId}:`,
+        error
+      );
+      throw error;
+    }
+  }
 }
