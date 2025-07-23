@@ -385,14 +385,16 @@ export function getGameState(lobbyId: string, userId: string) {
     };
   });
 
-  // Correction : on aplatit tout dans gameState
+  // Construction explicite de l'objet retourné
   return {
     lobbyId,
-    status: lobby.status,
+    status: String(lobby.status),
     hostId: lobby.hostId,
     settings: lobby.settings,
     players,
-    ...lobby.gameState,
+    startTime: lobby.gameState?.startTime,
+    countries: lobby.gameState?.countries,
+    // Ajoute ici d'autres champs de gameState si besoin
   };
 }
 
