@@ -294,20 +294,38 @@ function checkGameCompletion(lobbyId: string, playerId: string) {
 
   if (allFinished) {
     console.log(`LobbyManager.checkGameCompletion - Fin de jeu déclenchée !`);
-    endGame(lobbyId);
+    endGame(lobbyId).catch((error) => {
+      console.error("Erreur lors de la fin de jeu:", error);
+    });
   }
 }
 
 // Terminer la partie
-function endGame(lobbyId: string) {
+async function endGame(lobbyId: string) {
   const lobby = activeLobbies.get(lobbyId);
   if (!lobby) return;
 
   lobby.status = "finished";
   const rankings = GameStateManager.calculateRankings(lobby.players);
 
+  // Mettre à jour le statut du lobby en base de données
+  try {
+    const { updateLobbyStatus } = await import("../../models/lobbyModel.js");
+    await updateLobbyStatus(lobbyId, "finished");
+    console.log(
+      `Statut du lobby ${lobbyId} mis à jour en base de données vers 'finished'`
+    );
+  } catch (error) {
+    console.error(
+      `Erreur lors de la mise à jour du statut du lobby ${lobbyId} en base de données:`,
+      error
+    );
+  }
+
   console.log("LobbyManager.endGame - Fin de jeu, rankings:", rankings);
   BroadcastManager.broadcastGameResults(lobbyId, rankings);
+  // Diffuser un lobby_update avec le status finished pour synchroniser le frontend
+  BroadcastManager.broadcastLobbyUpdate(lobbyId, lobby);
 }
 
 // Supprimer un lobby

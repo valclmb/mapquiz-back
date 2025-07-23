@@ -114,6 +114,13 @@ export class LobbyService {
   }
 
   /**
+   * Récupère l'état du lobby (sans l'état du jeu complet)
+   */
+  static async getLobbyState(lobbyId: string, userId: string) {
+    return await LobbyGameService.getLobbyState(lobbyId, userId);
+  }
+
+  /**
    * Récupère l'état du jeu
    */
   static async getGameState(lobbyId: string, userId: string) {

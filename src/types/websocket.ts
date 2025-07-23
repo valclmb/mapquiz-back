@@ -14,6 +14,7 @@ export const WS_MESSAGE_TYPES = {
   UPDATE_GAME_PROGRESS: "update_game_progress",
   UPDATE_PLAYER_PROGRESS: "update_player_progress",
   GET_GAME_STATE: "get_game_state",
+  GET_LOBBY_STATE: "get_lobby_state",
   GET_GAME_RESULTS: "get_game_results",
   RESTART_GAME: "restart_game",
   LEAVE_GAME: "leave_game",

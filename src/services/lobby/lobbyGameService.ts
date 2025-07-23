@@ -311,6 +311,75 @@ export class LobbyGameService {
   }
 
   /**
+   * Récupère l'état du lobby (sans l'état du jeu complet)
+   */
+  static async getLobbyState(lobbyId: string, userId: string) {
+    const validatedLobbyId = validateLobbyId(lobbyId);
+
+    try {
+      // Vérifier que l'utilisateur est dans le lobby
+      const player = await LobbyModel.getPlayerInLobby(
+        validatedLobbyId,
+        userId
+      );
+      if (!player) {
+        throw new LobbyError(APP_CONSTANTS.ERRORS.UNAUTHORIZED);
+      }
+
+      // Récupérer le lobby depuis la base de données
+      const lobby = await LobbyModel.getLobby(validatedLobbyId);
+      if (!lobby) {
+        throw new LobbyError(APP_CONSTANTS.ERRORS.LOBBY_NOT_FOUND);
+      }
+
+      // Récupérer l'état en mémoire
+      const lobbyInMemory = LobbyManager.getLobbyInMemory(validatedLobbyId);
+      if (!lobbyInMemory) {
+        // Si pas en mémoire, retourner juste les infos de base
+        return {
+          lobbyId: lobby.id,
+          status: lobby.status,
+          hostId: lobby.hostId,
+          players: lobby.players.map((p) => ({
+            id: p.userId,
+            name: p.user.name,
+            score: p.score,
+            progress: p.progress,
+            status: p.status,
+          })),
+          settings: lobby.gameSettings,
+        };
+      }
+
+      // Retourner l'état complet du lobby (sans les pays)
+      const players = [];
+      for (const [playerId, playerData] of lobbyInMemory.players.entries()) {
+        players.push({
+          id: playerId,
+          name: playerData.name,
+          score: playerData.score,
+          progress: playerData.progress,
+          status: playerData.status,
+        });
+      }
+
+      return {
+        lobbyId: lobby.id,
+        status: lobby.status,
+        hostId: lobby.hostId,
+        players,
+        settings: lobbyInMemory.settings,
+      };
+    } catch (error) {
+      console.error(
+        `Erreur lors de la récupération de l'état du lobby ${lobbyId}:`,
+        error
+      );
+      throw error;
+    }
+  }
+
+  /**
    * Restaure l'état du jeu depuis la base de données
    */
   private static async restoreGameStateFromDatabase(
@@ -470,13 +539,20 @@ export class LobbyGameService {
         throw new LobbyError("Lobby non trouvé");
       }
 
+      console.log(
+        `LobbyGameService.getGameResults - Statut du lobby en BDD: ${lobby.status}`
+      );
+
       // Vérifier que la partie est terminée
       if (lobby.status !== APP_CONSTANTS.LOBBY_STATUS.FINISHED) {
+        console.log(
+          `LobbyGameService.getGameResults - Partie non terminée, statut: ${lobby.status}, attendu: finished`
+        );
         throw new LobbyError("La partie n'est pas encore terminée");
       }
 
       // Récupérer les joueurs avec leurs scores
-      const players = await LobbyPlayerService.getLobbyPlayers(lobbyId);
+      const players = await LobbyModel.getLobbyPlayers(lobbyId);
 
       // Créer le classement
       const rankings = players
@@ -485,7 +561,6 @@ export class LobbyGameService {
           name: player.user.name,
           score: player.score,
           rank: 0, // Sera calculé ci-dessous
-          completionTime: player.completionTime || null,
         }))
         .sort((a, b) => b.score - a.score); // Tri par score décroissant
 
@@ -498,7 +573,10 @@ export class LobbyGameService {
         `LobbyGameService.getGameResults - Résultats récupérés: ${rankings.length} joueurs`
       );
 
-      return rankings;
+      return {
+        rankings,
+        hostId: lobby.hostId,
+      };
     } catch (error) {
       console.error(
         `Erreur lors de la récupération des résultats pour le lobby ${lobbyId}:`,
@@ -518,7 +596,18 @@ export class LobbyGameService {
 
     // Vérifier que l'utilisateur est bien l'hôte du lobby
     const lobby = await LobbyModel.getLobby(lobbyId);
+    console.log(`LobbyGameService.restartGame - Lobby récupéré:`, {
+      lobbyId: lobby?.id,
+      hostId: lobby?.hostId,
+      userId: userId,
+      isHost: lobby?.hostId === userId,
+      lobbyExists: !!lobby,
+    });
+
     if (!lobby || lobby.hostId !== userId) {
+      console.log(
+        `LobbyGameService.restartGame - Erreur: utilisateur ${userId} n'est pas l'hôte du lobby ${lobbyId}`
+      );
       throw new LobbyError(APP_CONSTANTS.ERRORS.UNAUTHORIZED);
     }
 

@@ -140,6 +140,11 @@ export class WebSocketMessageHandler {
           result = await this.handleGetGameState(payload, userId!);
           break;
 
+        case WS_MESSAGE_TYPES.GET_LOBBY_STATE:
+          if (!this.requireAuth(userId, socket)) return;
+          result = await this.handleGetLobbyState(payload, userId!);
+          break;
+
         case WS_MESSAGE_TYPES.GET_GAME_RESULTS:
           if (!this.requireAuth(userId, socket)) return;
           result = await this.handleGetGameResults(payload, userId!);
@@ -234,6 +239,37 @@ export class WebSocketMessageHandler {
   }
 
   /**
+   * Gère la récupération de l'état du lobby (sans l'état du jeu complet)
+   */
+  private static async handleGetLobbyState(
+    payload: any,
+    userId: string
+  ): Promise<any> {
+    const { lobbyId } = payload;
+    if (!lobbyId) {
+      throw new Error("lobbyId requis");
+    }
+
+    try {
+      const { LobbyService } = await import("../../services/lobbyService.js");
+      const lobbyState = await LobbyService.getLobbyState(lobbyId, userId);
+
+      return {
+        lobbyId,
+        lobbyState,
+      };
+    } catch (error) {
+      console.error(
+        `Erreur lors de la récupération de l'état du lobby ${lobbyId}:`,
+        error
+      );
+      throw new Error(
+        `Impossible de récupérer l'état du lobby: ${error instanceof Error ? error.message : "Erreur inconnue"}`
+      );
+    }
+  }
+
+  /**
    * Gère la récupération des résultats de jeu
    */
   private static async handleGetGameResults(
@@ -251,7 +287,8 @@ export class WebSocketMessageHandler {
 
       return {
         lobbyId,
-        rankings: results,
+        rankings: results.rankings,
+        hostId: results.hostId,
       };
     } catch (error) {
       console.error(
@@ -278,12 +315,12 @@ export class WebSocketMessageHandler {
 
     try {
       const { LobbyService } = await import("../../services/lobbyService.js");
-      await LobbyService.restartGame(lobbyId, userId);
+      await LobbyService.restartGame(userId, lobbyId);
 
       // Diffuser un message de confirmation à tous les joueurs
       const { BroadcastManager } = await import("../lobby/broadcastManager.js");
       const { getLobbyInMemory } = await import("../lobby/lobbyManager.js");
-      
+
       const lobby = getLobbyInMemory(lobbyId);
       if (lobby) {
         // Diffuser un message de restart à tous les joueurs
