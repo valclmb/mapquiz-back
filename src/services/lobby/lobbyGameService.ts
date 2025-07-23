@@ -256,7 +256,7 @@ export class LobbyGameService {
     const lobbyInMemory = getLobbyInMemory(lobbyId);
     if (lobbyInMemory) {
       lobbyInMemory.settings = settings;
-      BroadcastManager.broadcastLobbyUpdate(lobbyId, lobbyInMemory); // Diffuse la mise à jour à tous les joueurs
+      await BroadcastManager.broadcastLobbyUpdate(lobbyId, lobbyInMemory); // Diffuse la mise à jour à tous les joueurs
     }
     // --- FIN PATCH ---
 
@@ -316,60 +316,163 @@ export class LobbyGameService {
   static async getLobbyState(lobbyId: string, userId: string) {
     const validatedLobbyId = validateLobbyId(lobbyId);
 
+    console.log(
+      `LobbyGameService.getLobbyState - Début pour lobbyId: ${lobbyId}, userId: ${userId}`
+    );
+
     try {
+      // Récupérer le lobby depuis la base de données d'abord
+      const lobby = await LobbyModel.getLobby(validatedLobbyId);
+      if (!lobby) {
+        console.log(
+          `LobbyGameService.getLobbyState - Lobby ${lobbyId} non trouvé en base de données`
+        );
+        throw new LobbyError(APP_CONSTANTS.ERRORS.LOBBY_NOT_FOUND);
+      }
+
+      console.log(`LobbyGameService.getLobbyState - Lobby trouvé en BDD:`, {
+        lobbyId: lobby.id,
+        status: lobby.status,
+        hostId: lobby.hostId,
+        playersCount: lobby.players.length,
+        players: lobby.players.map((p) => ({
+          id: p.userId,
+          name: p.user.name,
+          status: p.status,
+        })),
+      });
+
       // Vérifier que l'utilisateur est dans le lobby
       const player = await LobbyModel.getPlayerInLobby(
         validatedLobbyId,
         userId
       );
-      if (!player) {
-        throw new LobbyError(APP_CONSTANTS.ERRORS.UNAUTHORIZED);
-      }
 
-      // Récupérer le lobby depuis la base de données
-      const lobby = await LobbyModel.getLobby(validatedLobbyId);
-      if (!lobby) {
-        throw new LobbyError(APP_CONSTANTS.ERRORS.LOBBY_NOT_FOUND);
+      if (!player) {
+        console.log(
+          `LobbyGameService.getLobbyState - Utilisateur ${userId} non trouvé dans le lobby ${lobbyId}`
+        );
+        console.log(
+          `LobbyGameService.getLobbyState - Joueurs dans le lobby:`,
+          lobby.players.map((p) => ({
+            id: p.userId,
+            name: p.user.name,
+            status: p.status,
+          }))
+        );
+
+        // Si l'utilisateur n'est pas dans le lobby, vérifier s'il est autorisé
+        if (
+          !lobby.authorizedPlayers.includes(userId) &&
+          lobby.hostId !== userId
+        ) {
+          console.log(
+            `LobbyGameService.getLobbyState - Utilisateur ${userId} non autorisé à accéder au lobby ${lobbyId}`
+          );
+          throw new LobbyError("Vous n'êtes pas autorisé à accéder à ce lobby");
+        }
+
+        // L'utilisateur est autorisé mais pas encore dans le lobby
+        // On peut quand même lui montrer l'état du lobby pour qu'il puisse rejoindre
+        console.log(
+          `LobbyGameService.getLobbyState - Utilisateur ${userId} autorisé mais pas encore dans le lobby ${lobbyId}, affichage de l'état de base`
+        );
+      } else {
+        console.log(
+          `LobbyGameService.getLobbyState - Utilisateur ${userId} trouvé dans le lobby avec le statut: ${player.status}`
+        );
       }
 
       // Récupérer l'état en mémoire
       const lobbyInMemory = LobbyManager.getLobbyInMemory(validatedLobbyId);
       if (!lobbyInMemory) {
-        // Si pas en mémoire, retourner juste les infos de base
+        console.log(
+          `LobbyGameService.getLobbyState - Lobby ${lobbyId} non trouvé en mémoire, retour des infos de base`
+        );
+        // Si pas en mémoire, retourner les infos de base avec tous les joueurs (connectés et déconnectés)
+        const allPlayers = lobby.players.map((p) => ({
+          id: p.userId,
+          name: p.user.name,
+          score: p.score,
+          progress: p.progress,
+          status: p.status,
+          isDisconnected: p.status === "disconnected",
+          disconnectedAt: p.disconnectedAt,
+        }));
+
+        console.log(
+          `LobbyGameService.getLobbyState - Joueurs depuis la BDD:`,
+          allPlayers
+        );
+
         return {
           lobbyId: lobby.id,
           status: lobby.status,
           hostId: lobby.hostId,
-          players: lobby.players.map((p) => ({
-            id: p.userId,
-            name: p.user.name,
-            score: p.score,
-            progress: p.progress,
-            status: p.status,
-          })),
+          players: allPlayers,
           settings: lobby.gameSettings,
         };
       }
 
-      // Retourner l'état complet du lobby (sans les pays)
+      console.log(
+        `LobbyGameService.getLobbyState - Lobby trouvé en mémoire, joueurs:`,
+        Array.from(lobbyInMemory.players.keys())
+      );
+
+            // Retourner l'état complet du lobby (sans les pays)
       const players = [];
+      const playerIdsInMemory = new Set();
+      
+      // D'abord, ajouter tous les joueurs en mémoire
       for (const [playerId, playerData] of lobbyInMemory.players.entries()) {
+        playerIdsInMemory.add(playerId);
         players.push({
           id: playerId,
           name: playerData.name,
           score: playerData.score,
           progress: playerData.progress,
           status: playerData.status,
+          isDisconnected: playerData.status === "disconnected",
+          disconnectedAt: null, // Les joueurs en mémoire ne sont pas déconnectés
         });
       }
 
-      return {
+      // Ensuite, ajouter les joueurs déconnectés depuis la base de données
+      // qui ne sont PAS déjà en mémoire (même s'ils sont déconnectés)
+      const disconnectedPlayers = lobby.players.filter(
+        (p) => p.status === "disconnected" && !playerIdsInMemory.has(p.userId)
+      );
+      
+      for (const player of disconnectedPlayers) {
+        players.push({
+          id: player.userId,
+          name: player.user.name,
+          score: player.score,
+          progress: player.progress,
+          status: player.status,
+          isDisconnected: true,
+          disconnectedAt: player.disconnectedAt,
+        });
+      }
+
+      const result = {
         lobbyId: lobby.id,
         status: lobby.status,
         hostId: lobby.hostId,
         players,
         settings: lobbyInMemory.settings,
       };
+
+      console.log(
+        `LobbyGameService.getLobbyState - État du lobby retourné avec succès:`,
+        {
+          lobbyId: result.lobbyId,
+          status: result.status,
+          playersCount: result.players.length,
+        }
+      );
+
+      return result;
     } catch (error) {
       console.error(
         `Erreur lors de la récupération de l'état du lobby ${lobbyId}:`,
@@ -473,7 +576,19 @@ export class LobbyGameService {
       const playerName = user?.name || "Joueur inconnu";
 
       // Supprimer le joueur du lobby dans la base de données d'abord
-      await LobbyModel.removePlayerFromLobby(lobbyId, userId);
+      const removedPlayer = await LobbyModel.removePlayerFromLobby(
+        lobbyId,
+        userId
+      );
+
+      // Si le joueur n'existait pas dans la base de données, ne pas continuer
+      if (!removedPlayer) {
+        console.log(
+          `Joueur ${userId} n'était pas dans le lobby ${lobbyId}, arrêt de leaveGame`
+        );
+        return { success: true, message: "Joueur non trouvé dans le lobby" };
+      }
+
       console.log(`Joueur ${userId} supprimé de la base de données`);
 
       // Diffuser que le joueur a quitté la partie
@@ -638,6 +753,26 @@ export class LobbyGameService {
 
       // Réinitialiser l'état du jeu en mémoire
       LobbyManager.restartLobby(lobbyId);
+
+      // Restaurer les joueurs depuis la base de données vers la mémoire
+      const updatedLobby = await LobbyModel.getLobby(lobbyId);
+      if (updatedLobby) {
+        LobbyManager.restoreLobbyFromDatabase(lobbyId, updatedLobby);
+        console.log(
+          `LobbyGameService.restartGame - Joueurs restaurés depuis la base de données: ${updatedLobby.players?.length || 0} joueurs`
+        );
+
+        // Vérifier que tous les joueurs sont bien en mémoire
+        const { getLobbyInMemory } = await import(
+          "../../websocket/lobby/lobbyManager.js"
+        );
+        const lobbyInMemory = getLobbyInMemory(lobbyId);
+        if (lobbyInMemory) {
+          console.log(
+            `LobbyGameService.restartGame - Lobby en mémoire après restauration: ${lobbyInMemory.players.size} joueurs`
+          );
+        }
+      }
 
       console.log(
         `LobbyGameService.restartGame - Partie redémarrée avec succès pour le lobby ${lobbyId}`

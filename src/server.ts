@@ -7,6 +7,7 @@ import { config } from "./lib/config.js";
 import { prisma } from "./lib/database.js";
 import { errorHandler } from "./lib/errorHandler.js";
 import { apiRoutes } from "./routes/index.js";
+import { LobbyCleanupService } from "./services/lobby/lobbyCleanupService.js";
 import { setupWebSocketHandlers } from "./websocket/index.js";
 
 /**
@@ -74,6 +75,9 @@ await fastify.register(apiRoutes, { prefix: "/api" });
 
 // Configuration des WebSockets
 setupWebSocketHandlers(fastify);
+
+// Démarrage du service de nettoyage automatique des lobbies
+LobbyCleanupService.startCleanupService();
 
 // Pour désactiver les logs Fastify sur les requêtes WebSocket
 fastify.addHook("onRequest", (req, reply, done) => {

@@ -8,7 +8,7 @@ export class BroadcastManager {
   /**
    * Diffuse une mise à jour du lobby à tous les joueurs
    */
-  static broadcastLobbyUpdate(lobbyId: string, lobbyData: any): void {
+  static async broadcastLobbyUpdate(lobbyId: string, lobbyData: any): Promise<void> {
     console.log("BroadcastManager.broadcastLobbyUpdate - lobbyData:", {
       lobbyId,
       status: lobbyData.status,
@@ -16,7 +16,8 @@ export class BroadcastManager {
       playersCount: lobbyData.players.size,
     });
 
-    const players = Array.from(lobbyData.players.entries()).map(
+    // Récupérer les joueurs actifs du lobby en mémoire
+    const activePlayers = Array.from(lobbyData.players.entries()).map(
       (entry: any) => {
         const [id, data] = entry;
         return {
@@ -27,28 +28,84 @@ export class BroadcastManager {
           progress: data.progress || 0,
           validatedCountries: data.validatedCountries || [],
           incorrectCountries: data.incorrectCountries || [],
+          isDisconnected: false,
+          disconnectedAt: null,
         };
       }
     );
 
-    const message = {
-      type: "lobby_update",
-      payload: {
-        lobbyId,
-        players,
-        hostId: lobbyData.hostId,
-        settings: lobbyData.settings,
-        status: lobbyData.status || "waiting", // Fallback si status est undefined
-      },
-    };
+    // Récupérer les joueurs déconnectés depuis la base de données
+    try {
+      const { prisma } = await import("../../lib/database.js");
+      const disconnectedPlayers = await prisma.lobbyPlayer.findMany({
+        where: {
+          lobbyId,
+          status: "disconnected",
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      });
 
-    console.log("BroadcastManager.broadcastLobbyUpdate - message envoyé:", {
-      type: message.type,
-      payload: message.payload,
-    });
+      const disconnectedPlayersData = disconnectedPlayers.map((player) => ({
+        id: player.user.id,
+        name: player.user.name,
+        status: "disconnected",
+        score: 0,
+        progress: 0,
+        validatedCountries: [],
+        incorrectCountries: [],
+        isDisconnected: true,
+        disconnectedAt: player.disconnectedAt,
+      }));
 
-    for (const [playerId] of lobbyData.players) {
-      sendToUser(playerId, message);
+      // Combiner les joueurs actifs et déconnectés
+      const allPlayers = [...activePlayers, ...disconnectedPlayersData];
+
+      const message = {
+        type: "lobby_update",
+        payload: {
+          lobbyId,
+          players: allPlayers,
+          hostId: lobbyData.hostId,
+          settings: lobbyData.settings,
+          status: lobbyData.status || "waiting", // Fallback si status est undefined
+        },
+      };
+
+      console.log("BroadcastManager.broadcastLobbyUpdate - message envoyé:", {
+        type: message.type,
+        payload: message.payload,
+        playersCount: allPlayers.length,
+        disconnectedCount: disconnectedPlayersData.length,
+      });
+
+      for (const [playerId] of lobbyData.players) {
+        sendToUser(playerId, message);
+      }
+    } catch (error) {
+      console.error("Erreur lors de la récupération des joueurs déconnectés:", error);
+      
+      // En cas d'erreur, envoyer seulement les joueurs actifs
+      const message = {
+        type: "lobby_update",
+        payload: {
+          lobbyId,
+          players: activePlayers,
+          hostId: lobbyData.hostId,
+          settings: lobbyData.settings,
+          status: lobbyData.status || "waiting",
+        },
+      };
+
+      for (const [playerId] of lobbyData.players) {
+        sendToUser(playerId, message);
+      }
     }
   }
 

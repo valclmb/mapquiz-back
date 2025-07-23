@@ -24,7 +24,7 @@ export function createLobby(
 }
 
 // Ajouter un joueur au lobby
-export function addPlayerToLobby(
+export async function addPlayerToLobby(
   lobbyId: string,
   playerId: string,
   playerName: string
@@ -33,12 +33,12 @@ export function addPlayerToLobby(
   if (!lobby) return false;
 
   lobby.players.set(playerId, PlayerManager.createPlayer(playerName));
-  BroadcastManager.broadcastLobbyUpdate(lobbyId, lobby);
+  await BroadcastManager.broadcastLobbyUpdate(lobbyId, lobby);
   return true;
 }
 
 // Mettre à jour le statut d'un joueur
-export function updatePlayerStatus(
+export async function updatePlayerStatus(
   lobbyId: string,
   playerId: string,
   status: string
@@ -63,7 +63,7 @@ export function updatePlayerStatus(
   );
 
   // Toujours diffuser la mise à jour du lobby
-  BroadcastManager.broadcastLobbyUpdate(lobbyId, lobby);
+  await BroadcastManager.broadcastLobbyUpdate(lobbyId, lobby);
 
   // Si le statut est "ready", vérifier si tous les joueurs sont prêts en base de données
   // Permettre le démarrage automatique même avec 1 joueur (pour les tests solo)
@@ -185,7 +185,7 @@ export async function startGame(lobbyId: string) {
     `LobbyManager.startGame - Statut du lobby avant broadcast:`,
     lobby.status
   );
-  BroadcastManager.broadcastLobbyUpdate(lobbyId, lobby);
+  await BroadcastManager.broadcastLobbyUpdate(lobbyId, lobby);
   return true;
 }
 
@@ -333,7 +333,7 @@ async function endGame(lobbyId: string) {
   console.log("LobbyManager.endGame - Fin de jeu, rankings:", rankings);
   BroadcastManager.broadcastGameResults(lobbyId, rankings);
   // Diffuser un lobby_update avec le status finished pour synchroniser le frontend
-  BroadcastManager.broadcastLobbyUpdate(lobbyId, lobby);
+  await BroadcastManager.broadcastLobbyUpdate(lobbyId, lobby);
 }
 
 // Supprimer un lobby
@@ -342,7 +342,7 @@ export function removeLobby(lobbyId: string) {
 }
 
 // Supprimer un joueur du lobby
-export function removePlayerFromLobby(lobbyId: string, playerId: string) {
+export async function removePlayerFromLobby(lobbyId: string, playerId: string) {
   const lobby = activeLobbies.get(lobbyId);
   if (!lobby) return false;
 
@@ -357,8 +357,22 @@ export function removePlayerFromLobby(lobbyId: string, playerId: string) {
       const firstPlayer = lobby.players.keys().next().value;
       lobby.hostId = firstPlayer;
     }
-    BroadcastManager.broadcastLobbyUpdate(lobbyId, lobby);
+    await BroadcastManager.broadcastLobbyUpdate(lobbyId, lobby);
   }
+
+  return true;
+}
+
+// Retirer un joueur déconnecté du lobby (sans supprimer le lobby)
+export async function removeDisconnectedPlayerFromLobby(lobbyId: string, playerId: string) {
+  const lobby = activeLobbies.get(lobbyId);
+  if (!lobby) return false;
+
+  lobby.players.delete(playerId);
+
+  // Ne pas supprimer le lobby même s'il n'y a plus de joueurs en mémoire
+  // Le lobby reste actif pour permettre aux joueurs de revenir
+  await BroadcastManager.broadcastLobbyUpdate(lobbyId, lobby);
 
   return true;
 }
@@ -458,7 +472,7 @@ export function restoreLobbyFromDatabase(lobbyId: string, lobbyData: any) {
 }
 
 // Redémarrer un lobby
-export function restartLobby(lobbyId: string) {
+export async function restartLobby(lobbyId: string) {
   console.log(`LobbyManager.restartLobby - Redémarrage du lobby ${lobbyId}`);
 
   const lobby = activeLobbies.get(lobbyId);
@@ -475,7 +489,7 @@ export function restartLobby(lobbyId: string) {
   for (const [playerId, playerData] of lobby.players) {
     lobby.players.set(playerId, {
       ...playerData,
-      status: "not_ready",
+      status: "joined", // Remettre en "joined" au lieu de "not_ready"
       score: 0,
       progress: 0,
       validatedCountries: [],
@@ -485,7 +499,7 @@ export function restartLobby(lobbyId: string) {
   }
 
   // Diffuser la mise à jour du lobby
-  BroadcastManager.broadcastLobbyUpdate(lobbyId, lobby);
+  await BroadcastManager.broadcastLobbyUpdate(lobbyId, lobby);
 
   console.log(`Lobby ${lobbyId} redémarré avec succès`);
   return true;

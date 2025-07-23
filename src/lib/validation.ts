@@ -217,5 +217,18 @@ export function validateLobbyId(lobbyId: any): string {
  * Valide un identifiant d'utilisateur
  */
 export function validateUserId(userId: any): string {
-  return validateUUID(userId, "userId");
+  const userIdStr = validateRequiredString(userId, "userId");
+  
+  // UUID standard
+  const uuidRegex =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  
+  // ID de 32 caractères (comme ceux utilisés par certains systèmes d'auth)
+  const id32Regex = /^[0-9a-zA-Z]{32}$/;
+
+  if (!uuidRegex.test(userIdStr) && !id32Regex.test(userIdStr)) {
+    throw new ValidationError(`userId doit être un UUID valide ou un ID de 32 caractères`);
+  }
+
+  return userIdStr;
 }

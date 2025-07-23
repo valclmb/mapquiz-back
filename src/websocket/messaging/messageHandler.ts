@@ -109,6 +109,11 @@ export class WebSocketMessageHandler {
           );
           break;
 
+        case WS_MESSAGE_TYPES.SET_PLAYER_ABSENT:
+          if (!this.requireAuth(userId, socket)) return;
+          result = await this.handleSetPlayerAbsent(payload, userId!);
+          break;
+
         case WS_MESSAGE_TYPES.START_GAME:
           if (!this.requireAuth(userId, socket)) return;
           result = await WebSocketController.handleStartGame(payload, userId!);
@@ -133,6 +138,11 @@ export class WebSocketMessageHandler {
         case WS_MESSAGE_TYPES.LEAVE_GAME:
           if (!this.requireAuth(userId, socket)) return;
           result = await WebSocketController.handleLeaveGame(payload, userId!);
+          break;
+
+        case WS_MESSAGE_TYPES.REMOVE_PLAYER:
+          if (!this.requireAuth(userId, socket)) return;
+          result = await this.handleRemovePlayer(payload, userId!);
           break;
 
         case WS_MESSAGE_TYPES.GET_GAME_STATE:
@@ -188,6 +198,61 @@ export class WebSocketMessageHandler {
   }
 
   /**
+   * Gère la mise à jour du statut absent d'un joueur
+   */
+  private static async handleSetPlayerAbsent(
+    payload: any,
+    userId: string
+  ): Promise<any> {
+    console.log("handleSetPlayerAbsent - Début avec:", { payload, userId });
+
+    const { lobbyId, absent } = payload;
+    if (!lobbyId) {
+      throw new Error("lobbyId requis");
+    }
+    if (typeof absent !== "boolean") {
+      throw new Error("absent doit être un booléen");
+    }
+    if (!userId) {
+      throw new Error("userId requis");
+    }
+
+    console.log(
+      "handleSetPlayerAbsent - Validation passée, appel de LobbyService.setPlayerAbsent"
+    );
+
+    try {
+      const { LobbyService } = await import("../../services/lobbyService.js");
+      await LobbyService.setPlayerAbsent(userId, lobbyId, absent);
+
+      // Diffuser la mise à jour à tous les joueurs du lobby
+      const { BroadcastManager } = await import("../lobby/broadcastManager.js");
+      const { getLobbyInMemory } = await import("../lobby/lobbyManager.js");
+
+      const lobby = getLobbyInMemory(lobbyId);
+      if (lobby) {
+        await BroadcastManager.broadcastLobbyUpdate(lobbyId, lobby);
+      }
+
+      return {
+        lobbyId,
+        absent,
+        message: absent
+          ? "Joueur marqué comme absent"
+          : "Joueur marqué comme présent",
+      };
+    } catch (error) {
+      console.error(
+        `Erreur lors de la mise à jour du statut absent pour le lobby ${lobbyId}:`,
+        error
+      );
+      throw new Error(
+        `Impossible de mettre à jour le statut absent: ${error instanceof Error ? error.message : "Erreur inconnue"}`
+      );
+    }
+  }
+
+  /**
    * Gère la récupération de l'état du jeu
    */
   private static async handleGetGameState(
@@ -222,7 +287,7 @@ export class WebSocketMessageHandler {
           console.log(
             `Broadcast de la mise à jour du lobby ${lobbyId} après get_game_state`
           );
-          BroadcastManager.broadcastLobbyUpdate(lobbyId, lobby);
+          await BroadcastManager.broadcastLobbyUpdate(lobbyId, lobby);
         } else {
           console.log(
             `Lobby ${lobbyId} non trouvé en mémoire pour le broadcast`
@@ -273,9 +338,17 @@ export class WebSocketMessageHandler {
       throw new Error("lobbyId requis");
     }
 
+    console.log(
+      `WebSocketMessageHandler.handleGetLobbyState - Début pour lobbyId: ${lobbyId}, userId: ${userId}`
+    );
+
     try {
       const { LobbyService } = await import("../../services/lobbyService.js");
       const lobbyState = await LobbyService.getLobbyState(lobbyId, userId);
+
+      console.log(
+        `WebSocketMessageHandler.handleGetLobbyState - État du lobby récupéré avec succès pour ${lobbyId}`
+      );
 
       return {
         lobbyId,
@@ -283,12 +356,28 @@ export class WebSocketMessageHandler {
       };
     } catch (error) {
       console.error(
-        `Erreur lors de la récupération de l'état du lobby ${lobbyId}:`,
+        `WebSocketMessageHandler.handleGetLobbyState - Erreur lors de la récupération de l'état du lobby ${lobbyId}:`,
         error
       );
-      throw new Error(
-        `Impossible de récupérer l'état du lobby: ${error instanceof Error ? error.message : "Erreur inconnue"}`
-      );
+
+      // Donner des messages d'erreur plus précis
+      let errorMessage = "Impossible de récupérer l'état du lobby";
+
+      if (error instanceof Error) {
+        if (error.message.includes("Non autorisé")) {
+          errorMessage =
+            "Vous n'êtes pas autorisé à accéder à ce lobby. Veuillez rejoindre le lobby d'abord.";
+        } else if (error.message.includes("Lobby non trouvé")) {
+          errorMessage = "Ce lobby n'existe pas ou a été supprimé.";
+        } else if (error.message.includes("Utilisateur non trouvé")) {
+          errorMessage =
+            "Problème d'authentification. Veuillez vous reconnecter.";
+        } else {
+          errorMessage = `Impossible de récupérer l'état du lobby: ${error.message}`;
+        }
+      }
+
+      throw new Error(errorMessage);
     }
   }
 
@@ -340,6 +429,20 @@ export class WebSocketMessageHandler {
       const { LobbyService } = await import("../../services/lobbyService.js");
       await LobbyService.restartGame(userId, lobbyId);
 
+      // S'assurer que le lobby est bien restauré en mémoire avec tous les joueurs
+      const { getLobby } = await import("../../models/lobbyModel.js");
+      const { restoreLobbyFromDatabase } = await import(
+        "../lobby/lobbyManager.js"
+      );
+
+      const updatedLobby = await getLobby(lobbyId);
+      if (updatedLobby) {
+        restoreLobbyFromDatabase(lobbyId, updatedLobby);
+        console.log(
+          `MessageHandler.handleRestartGame - Lobby restauré avec ${updatedLobby.players?.length || 0} joueurs`
+        );
+      }
+
       // Diffuser un message de confirmation à tous les joueurs
       const { BroadcastManager } = await import("../lobby/broadcastManager.js");
       const { getLobbyInMemory } = await import("../lobby/lobbyManager.js");
@@ -372,6 +475,100 @@ export class WebSocketMessageHandler {
       );
       throw new Error(
         `Impossible de redémarrer la partie: ${error instanceof Error ? error.message : "Erreur inconnue"}`
+      );
+    }
+  }
+
+  /**
+   * Gère la suppression d'un joueur par l'hôte
+   */
+  private static async handleRemovePlayer(
+    payload: any,
+    userId: string
+  ): Promise<any> {
+    const { lobbyId, playerId } = payload;
+    if (!lobbyId) {
+      throw new Error("lobbyId requis");
+    }
+    if (!playerId) {
+      throw new Error("playerId requis");
+    }
+
+    try {
+      // Vérifier que l'utilisateur est l'hôte du lobby
+      const { getLobby, removePlayerFromLobby } = await import(
+        "../../models/lobbyModel.js"
+      );
+      const lobby = await getLobby(lobbyId);
+
+      if (!lobby) {
+        throw new Error("Lobby non trouvé");
+      }
+
+      if (lobby.hostId !== userId) {
+        throw new Error("Seul l'hôte peut supprimer des joueurs");
+      }
+
+      if (lobby.hostId === playerId) {
+        throw new Error("L'hôte ne peut pas se supprimer lui-même");
+      }
+
+      // Supprimer le joueur du lobby en base de données
+      await removePlayerFromLobby(lobbyId, playerId);
+
+      // Supprimer le joueur du lobby en mémoire
+      const { removePlayerFromLobby: removePlayerFromMemory } = await import(
+        "../lobby/lobbyManager.js"
+      );
+      await removePlayerFromMemory(lobbyId, playerId);
+
+      // Retirer le joueur de la liste des joueurs autorisés
+      const { updateLobbyAuthorizedPlayers } = await import(
+        "../../models/lobbyModel.js"
+      );
+      await updateLobbyAuthorizedPlayers(lobbyId, playerId, "remove");
+
+      // Diffuser la mise à jour du lobby
+      const { BroadcastManager } = await import("../lobby/broadcastManager.js");
+      const { getLobbyInMemory } = await import("../lobby/lobbyManager.js");
+
+      const lobbyInMemory = getLobbyInMemory(lobbyId);
+      if (lobbyInMemory) {
+        await BroadcastManager.broadcastLobbyUpdate(lobbyId, lobbyInMemory);
+      }
+
+      // Envoyer un message de confirmation à l'hôte
+      const { sendToUser } = await import("../core/connectionManager.js");
+      sendToUser(userId, {
+        type: "remove_player_success",
+        payload: {
+          lobbyId,
+          playerId,
+          message: "Joueur supprimé avec succès",
+        },
+      });
+
+      // Envoyer un message au joueur supprimé pour qu'il quitte le lobby
+      sendToUser(playerId, {
+        type: "player_removed",
+        payload: {
+          lobbyId,
+          message: "Vous avez été expulsé du lobby par l'hôte",
+        },
+      });
+
+      return {
+        lobbyId,
+        playerId,
+        message: "Joueur supprimé avec succès",
+      };
+    } catch (error) {
+      console.error(
+        `Erreur lors de la suppression du joueur ${playerId} du lobby ${lobbyId}:`,
+        error
+      );
+      throw new Error(
+        `Impossible de supprimer le joueur: ${error instanceof Error ? error.message : "Erreur inconnue"}`
       );
     }
   }

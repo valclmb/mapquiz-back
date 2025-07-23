@@ -67,6 +67,17 @@ export class LobbyService {
   }
 
   /**
+   * Met à jour le statut absent d'un joueur
+   */
+  static async setPlayerAbsent(
+    userId: string,
+    lobbyId: string,
+    absent: boolean
+  ) {
+    return await LobbyPlayerService.setPlayerAbsent(userId, lobbyId, absent);
+  }
+
+  /**
    * Démarre une partie
    */
   static async startGame(userId: string, lobbyId: string) {

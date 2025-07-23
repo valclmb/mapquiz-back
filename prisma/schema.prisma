@@ -134,8 +134,10 @@ model GameLobby {
   status        String   @default("waiting") // waiting, playing, finished
   gameSettings  Json     // Stocke les paramètres du jeu (continents, etc.)
   gameState     Json?    // Stocke l'état du jeu (countries, startTime, etc.)
+  authorizedPlayers String[] @default([]) // Tableau d'IDs d'utilisateurs autorisés
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+  lastActivityAt DateTime @default(now()) // Timestamp de dernière activité pour la suppression différée
   players       LobbyPlayer[]
   gameResults   MultiplayerGameResult[]
 
@@ -148,12 +150,13 @@ model LobbyPlayer {
   lobby     GameLobby @relation(fields: [lobbyId], references: [id], onDelete: Cascade)
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  status    String   @default("invited") // invited, joined, ready, playing
+  status    String   @default("joined") // joined, ready, playing, disconnected
   score     Int      @default(0)
   progress  Int      @default(0)
   validatedCountries String[] @default([])
   incorrectCountries String[] @default([])
   joinedAt  DateTime @default(now())
+  disconnectedAt DateTime? // Timestamp de déconnexion pour la suppression différée
 
   @@unique([lobbyId, userId])
   @@map("lobby_player")

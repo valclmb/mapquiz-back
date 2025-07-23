@@ -1,6 +1,6 @@
 import { APP_CONSTANTS } from "../../lib/config.js";
 import { LobbyError, NotFoundError } from "../../lib/errors.js";
-import { validateLobbyId } from "../../lib/validation.js";
+import { validateLobbyId, validateUserId } from "../../lib/validation.js";
 import * as LobbyModel from "../../models/lobbyModel.js";
 import * as UserModel from "../../models/userModel.js";
 import { LobbyPlayer } from "../../types/index.js";
@@ -33,7 +33,10 @@ export class LobbyPlayerService {
       return { success: true, message: "Joueur déjà dans le lobby" };
     }
 
-    // Envoyer une notification à l'ami (sans l'ajouter au lobby)
+    // Ajouter l'utilisateur à la liste des joueurs autorisés
+    await LobbyModel.addAuthorizedPlayer(lobbyId, friendId);
+
+    // Envoyer une notification à l'ami
     sendToUser(friendId, {
       type: "lobby_invitation",
       payload: {
@@ -51,10 +54,28 @@ export class LobbyPlayerService {
    * Rejoint un lobby
    */
   static async joinLobby(userId: string, lobbyId: string) {
+    console.log(
+      `joinLobby - Tentative de rejoindre le lobby ${lobbyId} par l'utilisateur ${userId}`
+    );
+
     // Vérifier que le lobby existe
     const lobby = await LobbyModel.getLobby(lobbyId);
+    console.log(
+      `joinLobby - Résultat de getLobby pour ${lobbyId}:`,
+      lobby ? "trouvé" : "non trouvé"
+    );
+
     if (!lobby) {
+      console.log(`joinLobby - Lobby ${lobbyId} non trouvé en base de données`);
       throw new NotFoundError("Lobby");
+    }
+
+    // Vérifier si l'utilisateur est autorisé à rejoindre le lobby
+    if (!lobby.authorizedPlayers.includes(userId) && lobby.hostId !== userId) {
+      console.log(
+        `joinLobby - Utilisateur ${userId} non autorisé à rejoindre le lobby ${lobbyId}`
+      );
+      throw new LobbyError("Vous n'êtes pas autorisé à rejoindre ce lobby");
     }
 
     // Vérifier si l'utilisateur est déjà dans le lobby
@@ -122,17 +143,64 @@ export class LobbyPlayerService {
    * Quitte un lobby
    */
   static async leaveLobby(userId: string, lobbyId: string) {
+    // Récupérer les informations du joueur avant de le supprimer
+    const user = await UserModel.findUserById(userId);
+    const playerName = user?.name || "Joueur inconnu";
+
     // Supprimer le joueur du lobby dans la base de données
-    await LobbyModel.removePlayerFromLobby(lobbyId, userId);
+    const removedPlayer = await LobbyModel.removePlayerFromLobby(
+      lobbyId,
+      userId
+    );
+
+    // Si le joueur n'existait pas dans la base de données, ne pas continuer
+    if (!removedPlayer) {
+      console.log(
+        `Joueur ${userId} n'était pas dans le lobby ${lobbyId}, arrêt de leaveLobby`
+      );
+      return { success: true, message: "Joueur non trouvé dans le lobby" };
+    }
 
     // Supprimer le joueur du lobby en mémoire
     LobbyManager.removePlayerFromLobby(lobbyId, userId);
 
-    // Si c'était l'hôte, supprimer le lobby
+    // Diffuser que le joueur a quitté le lobby
+    const { BroadcastManager } = await import(
+      "../../websocket/lobby/broadcastManager.js"
+    );
+    BroadcastManager.broadcastPlayerLeftGame(lobbyId, userId, playerName);
+
+    // Vérifier si c'était l'hôte et s'il reste d'autres joueurs
     const lobby = await LobbyModel.getLobby(lobbyId);
     if (lobby && lobby.hostId === userId) {
-      await LobbyModel.deleteLobby(lobbyId);
-      LobbyManager.removeLobby(lobbyId);
+      // Si c'était l'hôte, vérifier s'il reste d'autres joueurs
+      const remainingPlayers = await LobbyModel.getLobbyPlayers(lobbyId);
+
+      if (remainingPlayers.length === 0) {
+        // Si plus de joueurs, supprimer le lobby
+        console.log(
+          `Hôte ${userId} a quitté et plus de joueurs, suppression du lobby ${lobbyId}`
+        );
+        await LobbyModel.deleteLobby(lobbyId);
+        LobbyManager.removeLobby(lobbyId);
+      } else {
+        // S'il reste des joueurs, transférer l'hôte au premier joueur restant
+        const newHost = remainingPlayers[0];
+        console.log(
+          `Hôte ${userId} a quitté, transfert de l'hôte à ${newHost.user.name} (${newHost.userId})`
+        );
+
+        // Mettre à jour l'hôte en base de données
+        await LobbyModel.updateLobbyHost(lobbyId, newHost.userId);
+
+        // Mettre à jour l'hôte en mémoire
+        const lobbyInMemory = LobbyManager.getLobbyInMemory(lobbyId);
+        if (lobbyInMemory) {
+          lobbyInMemory.hostId = newHost.userId;
+          // Diffuser la mise à jour du lobby
+          await BroadcastManager.broadcastLobbyUpdate(lobbyId, lobbyInMemory);
+        }
+      }
     }
 
     return { success: true, message: "Lobby quitté" };
@@ -216,6 +284,127 @@ export class LobbyPlayerService {
       name: p.user.name,
       status: p.status as LobbyPlayer["status"],
     }));
+  }
+
+  /**
+   * Met à jour le statut absent d'un joueur
+   */
+  static async setPlayerAbsent(
+    userId: string,
+    lobbyId: string,
+    absent: boolean
+  ): Promise<void> {
+    const validatedLobbyId = validateLobbyId(lobbyId);
+    const validatedUserId = validateUserId(userId);
+
+    // Récupérer le lobby et le joueur
+    const lobby = await LobbyModel.getLobby(validatedLobbyId);
+    if (!lobby) {
+      throw new NotFoundError("Lobby");
+    }
+
+    const player = await LobbyModel.getPlayerInLobby(
+      validatedLobbyId,
+      validatedUserId
+    );
+    if (!player) {
+      throw new NotFoundError("Joueur dans le lobby");
+    }
+
+    // Déterminer le nouveau statut
+    let newStatus: string;
+    if (absent) {
+      newStatus = APP_CONSTANTS.PLAYER_STATUS.DISCONNECTED;
+    } else {
+      // Si le joueur revient, le remettre en statut "joined"
+      newStatus = APP_CONSTANTS.PLAYER_STATUS.JOINED;
+    }
+
+    // Mettre à jour en base de données
+    await LobbyModel.updatePlayerStatus(
+      validatedLobbyId,
+      validatedUserId,
+      newStatus
+    );
+
+    // Gérer la mémoire selon le statut
+    if (absent) {
+      // Si le joueur est absent, le retirer de la mémoire (sans supprimer le lobby)
+      LobbyManager.removeDisconnectedPlayerFromLobby(validatedLobbyId, validatedUserId);
+    } else {
+      // Si le joueur revient, le remettre en mémoire avec le statut "joined"
+      LobbyManager.updatePlayerStatus(
+        validatedLobbyId,
+        validatedUserId,
+        newStatus
+      );
+    }
+
+    console.log(
+      `Joueur ${validatedUserId} marqué comme ${absent ? "absent" : "présent"} dans le lobby ${validatedLobbyId}`
+    );
+  }
+
+  /**
+   * Met à jour la présence d'un joueur dans le lobby
+   */
+  static async setPlayerPresent(
+    userId: string,
+    lobbyId: string,
+    present: boolean
+  ): Promise<void> {
+    const validatedLobbyId = validateLobbyId(lobbyId);
+    const validatedUserId = validateUserId(userId);
+
+    console.log(
+      `LobbyPlayerService.setPlayerPresent - Début pour userId: ${userId}, lobbyId: ${lobbyId}, present: ${present}`
+    );
+
+    // Vérifier que le lobby existe
+    const lobby = await LobbyModel.getLobby(validatedLobbyId);
+    if (!lobby) {
+      throw new LobbyError(APP_CONSTANTS.ERRORS.LOBBY_NOT_FOUND);
+    }
+
+    // Vérifier que l'utilisateur est dans le lobby
+    const player = await LobbyModel.getPlayerInLobby(
+      validatedLobbyId,
+      validatedUserId
+    );
+    if (!player) {
+      throw new LobbyError("Joueur non trouvé dans le lobby");
+    }
+
+    // Déterminer le nouveau statut basé sur la présence
+    let newStatus: string;
+    if (present) {
+      // Si le joueur devient présent, le remettre en "joined" s'il était "disconnected"
+      newStatus = player.status === "disconnected" ? "joined" : player.status;
+    } else {
+      // Si le joueur devient absent, le marquer comme "disconnected"
+      newStatus = "disconnected";
+    }
+
+    // Mettre à jour le statut en base de données
+    await LobbyModel.updatePlayerStatus(
+      validatedLobbyId,
+      validatedUserId,
+      newStatus
+    );
+
+    // Mettre à jour le statut en mémoire
+    const lobbyInMemory = LobbyManager.getLobbyInMemory(validatedLobbyId);
+    if (lobbyInMemory && lobbyInMemory.players.has(validatedUserId)) {
+      LobbyManager.updatePlayerStatus(
+        validatedLobbyId,
+        validatedUserId,
+        newStatus
+      );
+    }
+
+    console.log(
+      `LobbyPlayerService.setPlayerPresent - Joueur ${userId} ${present ? "présent" : "absent"} dans le lobby ${lobbyId}`
+    );
   }
 
   /**

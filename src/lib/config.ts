@@ -86,6 +86,7 @@ export const APP_CONSTANTS = {
     JOINED: "joined",
     READY: "ready",
     PLAYING: "playing",
+    DISCONNECTED: "disconnected",
   },
 
   // Types de messages WebSocket
@@ -113,6 +114,8 @@ export const APP_CONSTANTS = {
     WEBSOCKET_PING_INTERVAL: 30000, // 30 secondes
     WEBSOCKET_PONG_TIMEOUT: 10000, // 10 secondes
     GAME_SESSION_TIMEOUT: 3600000, // 1 heure
+    LOBBY_CLEANUP_DELAY: 300000, // 5 minutes avant suppression d'un lobby inactif
+    PLAYER_DISCONNECT_TIMEOUT: 60000, // 1 minute avant suppression d'un joueur déconnecté
   },
 } as const;
 

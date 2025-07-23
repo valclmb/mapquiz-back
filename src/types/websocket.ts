@@ -10,6 +10,7 @@ export const WS_MESSAGE_TYPES = {
   LEAVE_LOBBY: "leave_lobby",
   UPDATE_LOBBY_SETTINGS: "update_lobby_settings",
   SET_PLAYER_READY: "set_player_ready",
+  SET_PLAYER_ABSENT: "set_player_absent",
   START_GAME: "start_game",
   UPDATE_GAME_PROGRESS: "update_game_progress",
   UPDATE_PLAYER_PROGRESS: "update_player_progress",
@@ -18,6 +19,8 @@ export const WS_MESSAGE_TYPES = {
   GET_GAME_RESULTS: "get_game_results",
   RESTART_GAME: "restart_game",
   LEAVE_GAME: "leave_game",
+  REMOVE_PLAYER: "remove_player",
+  PLAYER_REMOVED: "player_removed",
 } as const;
 
 // Types pour les messages WebSocket

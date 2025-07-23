@@ -1,5 +1,5 @@
 import { FastifyInstance } from "fastify";
-import { getLobby } from "../models/LobbyModel.js";
+import { getLobby } from "../models/lobbyModel.js";
 
 export async function lobbiesRoutes(fastify: FastifyInstance) {
   // GET /api/lobbies/:lobbyId/status
@@ -8,7 +8,7 @@ export async function lobbiesRoutes(fastify: FastifyInstance) {
 
     try {
       const lobby = await getLobby(lobbyId);
-      
+
       if (!lobby) {
         return reply.status(404).send({
           error: "Lobby non trouvé",
@@ -21,7 +21,10 @@ export async function lobbiesRoutes(fastify: FastifyInstance) {
         lobbyId: lobby.id,
       };
     } catch (error) {
-      console.error("Erreur lors de la récupération du statut du lobby:", error);
+      console.error(
+        "Erreur lors de la récupération du statut du lobby:",
+        error
+      );
       return reply.status(500).send({
         error: "Erreur serveur",
         message: "Impossible de récupérer le statut du lobby",

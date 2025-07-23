@@ -36,6 +36,7 @@ export class LobbyCreationService {
       validatedData.name,
       validatedData.settings
     );
+    console.log(`createLobby - Lobby créé en base de données: ${lobby.id}`);
 
     // Créer le lobby en mémoire pour la gestion en temps réel
     LobbyManager.createLobby(
@@ -44,6 +45,7 @@ export class LobbyCreationService {
       user.name,
       validatedData.settings
     );
+    console.log(`createLobby - Lobby créé en mémoire: ${lobby.id}`);
 
     // Construire la réponse
     const players: LobbyPlayer[] = [
