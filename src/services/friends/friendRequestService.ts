@@ -69,8 +69,8 @@ export class FriendRequestService {
       friendUser.id
     );
 
-    // Envoyer une notification à l'ami
-    this.sendFriendRequestNotification(friendUser.id, friendRequest, senderId);
+    // Envoyer une notification à l'ami (WebSocket, sans payload spécifique)
+    FriendRequestService.sendFriendRequestNotification(friendUser.id);
 
     return {
       success: true,
@@ -127,29 +127,9 @@ export class FriendRequestService {
   /**
    * Envoie une notification de demande d'ami
    */
-  private static sendFriendRequestNotification(
-    receiverId: string,
-    friendRequest: any,
-    senderId: string
-  ): void {
-    const notificationSent = sendToUser(receiverId, {
+  static sendFriendRequestNotification(receiverId: string): void {
+    sendToUser(receiverId, {
       type: "friend_request_received",
-      payload: {
-        request: {
-          id: friendRequest.id,
-          senderId,
-          senderName: "Nom de l'expéditeur", // TODO: Récupérer le vrai nom
-          senderTag: "Tag de l'expéditeur", // TODO: Récupérer le vrai tag
-        },
-      },
     });
-
-    if (notificationSent) {
-      // console.log(`Notification envoyée à l'utilisateur ${receiverId}`);
-    } else {
-      // console.log(
-      //   `Utilisateur ${receiverId} pas connecté - notification ignorée`
-      // );
-    }
   }
 }
