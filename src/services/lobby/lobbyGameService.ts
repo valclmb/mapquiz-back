@@ -477,7 +477,7 @@ export class LobbyGameService {
 
       // Récupérer les joueurs avec leurs scores
       const players = await LobbyPlayerService.getLobbyPlayers(lobbyId);
-      
+
       // Créer le classement
       const rankings = players
         .map((player) => ({
@@ -539,9 +539,21 @@ export class LobbyGameService {
         );
         await LobbyModel.updatePlayerScore(lobbyId, player.userId, 0);
         await LobbyModel.updatePlayerProgress(lobbyId, player.userId, 0);
-        await LobbyModel.updatePlayerValidatedCountries(lobbyId, player.userId, []);
-        await LobbyModel.updatePlayerIncorrectCountries(lobbyId, player.userId, []);
-        await LobbyModel.updatePlayerCompletionTime(lobbyId, player.userId, null);
+        await LobbyModel.updatePlayerValidatedCountries(
+          lobbyId,
+          player.userId,
+          []
+        );
+        await LobbyModel.updatePlayerIncorrectCountries(
+          lobbyId,
+          player.userId,
+          []
+        );
+        await LobbyModel.updatePlayerCompletionTime(
+          lobbyId,
+          player.userId,
+          null
+        );
       }
 
       // Réinitialiser l'état du jeu en mémoire

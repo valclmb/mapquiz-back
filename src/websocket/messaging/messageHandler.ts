@@ -280,6 +280,27 @@ export class WebSocketMessageHandler {
       const { LobbyService } = await import("../../services/lobbyService.js");
       await LobbyService.restartGame(lobbyId, userId);
 
+      // Diffuser un message de confirmation à tous les joueurs
+      const { BroadcastManager } = await import("../lobby/broadcastManager.js");
+      const { getLobbyInMemory } = await import("../lobby/lobbyManager.js");
+      
+      const lobby = getLobbyInMemory(lobbyId);
+      if (lobby) {
+        // Diffuser un message de restart à tous les joueurs
+        const restartMessage = {
+          type: "game_restarted",
+          payload: {
+            lobbyId,
+            message: "Partie redémarrée par l'hôte",
+          },
+        };
+
+        for (const [playerId] of lobby.players) {
+          const { sendToUser } = await import("../core/connectionManager.js");
+          sendToUser(playerId, restartMessage);
+        }
+      }
+
       return {
         lobbyId,
         message: "Partie redémarrée avec succès",
