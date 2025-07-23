@@ -385,15 +385,14 @@ export function getGameState(lobbyId: string, userId: string) {
     };
   });
 
+  // Correction : on aplatit tout dans gameState
   return {
     lobbyId,
     status: lobby.status,
     hostId: lobby.hostId,
     settings: lobby.settings,
-    gameState: {
-      ...lobby.gameState,
-      players,
-    },
+    players,
+    ...lobby.gameState,
   };
 }
 
