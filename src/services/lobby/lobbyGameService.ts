@@ -624,7 +624,7 @@ export class LobbyGameService {
         await LobbyModel.updatePlayerStatus(
           lobbyId,
           player.userId,
-          APP_CONSTANTS.PLAYER_STATUS.NOT_READY
+          APP_CONSTANTS.PLAYER_STATUS.JOINED
         );
         await LobbyModel.updatePlayerScore(lobbyId, player.userId, 0);
         await LobbyModel.updatePlayerProgress(lobbyId, player.userId, 0);

@@ -9,6 +9,13 @@ export class BroadcastManager {
    * Diffuse une mise à jour du lobby à tous les joueurs
    */
   static broadcastLobbyUpdate(lobbyId: string, lobbyData: any): void {
+    console.log("BroadcastManager.broadcastLobbyUpdate - lobbyData:", {
+      lobbyId,
+      status: lobbyData.status,
+      hostId: lobbyData.hostId,
+      playersCount: lobbyData.players.size,
+    });
+
     const players = Array.from(lobbyData.players.entries()).map(
       (entry: any) => {
         const [id, data] = entry;
@@ -16,8 +23,10 @@ export class BroadcastManager {
           id,
           name: data.name,
           status: data.status,
-          score: data.score,
-          progress: data.progress,
+          score: data.score || 0,
+          progress: data.progress || 0,
+          validatedCountries: data.validatedCountries || [],
+          incorrectCountries: data.incorrectCountries || [],
         };
       }
     );
@@ -29,9 +38,14 @@ export class BroadcastManager {
         players,
         hostId: lobbyData.hostId,
         settings: lobbyData.settings,
-        status: lobbyData.status,
+        status: lobbyData.status || "waiting", // Fallback si status est undefined
       },
     };
+
+    console.log("BroadcastManager.broadcastLobbyUpdate - message envoyé:", {
+      type: message.type,
+      payload: message.payload,
+    });
 
     for (const [playerId] of lobbyData.players) {
       sendToUser(playerId, message);

@@ -178,6 +178,14 @@ export async function startGame(lobbyId: string) {
 
   console.log(`LobbyManager.startGame - Broadcast du début de partie`);
   BroadcastManager.broadcastGameStart(lobbyId, lobby);
+
+  // Diffuser aussi la mise à jour du lobby avec le nouveau statut "playing"
+  console.log(`LobbyManager.startGame - Broadcast de la mise à jour du lobby`);
+  console.log(
+    `LobbyManager.startGame - Statut du lobby avant broadcast:`,
+    lobby.status
+  );
+  BroadcastManager.broadcastLobbyUpdate(lobbyId, lobby);
   return true;
 }
 
