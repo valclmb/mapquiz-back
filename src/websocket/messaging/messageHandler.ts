@@ -199,17 +199,44 @@ export class WebSocketMessageHandler {
       throw new Error("lobbyId requis");
     }
 
-    // console.log(
-    //   `Demande d'état du jeu pour le lobby ${lobbyId} par l'utilisateur ${userId}`
-    // );
+    console.log(
+      `Demande d'état du jeu pour le lobby ${lobbyId} par l'utilisateur ${userId}`
+    );
 
     try {
       // Utiliser directement le service de lobby pour récupérer l'état du jeu
       const { LobbyService } = await import("../../services/lobbyService.js");
       const gameState = await LobbyService.getGameState(lobbyId, userId);
 
+      // Déclencher aussi une mise à jour du lobby pour que le frontend puisse traiter l'état
+      // (même si gameState est null, on veut quand même l'état du lobby)
+      try {
+        const { BroadcastManager } = await import(
+          "../lobby/broadcastManager.js"
+        );
+        const { getLobbyInMemory } = await import("../lobby/lobbyManager.js");
+
+        // Récupérer le lobby en mémoire pour le broadcast
+        const lobby = getLobbyInMemory(lobbyId);
+        if (lobby) {
+          console.log(
+            `Broadcast de la mise à jour du lobby ${lobbyId} après get_game_state`
+          );
+          BroadcastManager.broadcastLobbyUpdate(lobbyId, lobby);
+        } else {
+          console.log(
+            `Lobby ${lobbyId} non trouvé en mémoire pour le broadcast`
+          );
+        }
+      } catch (broadcastError) {
+        console.error(
+          "Erreur lors du broadcast de la mise à jour du lobby:",
+          broadcastError
+        );
+      }
+
       if (!gameState) {
-        // console.log(`Aucun état de jeu trouvé pour le lobby ${lobbyId}`);
+        console.log(`Aucun état de jeu trouvé pour le lobby ${lobbyId}`);
         return {
           lobbyId,
           gameState: null,
@@ -217,11 +244,7 @@ export class WebSocketMessageHandler {
         };
       }
 
-      // console.log(`État du jeu récupéré avec succès pour le lobby ${lobbyId}`);
-      // console.log(
-      //   "Structure du gameState envoyé:",
-      //   JSON.stringify(gameState, null, 2)
-      // );
+      console.log(`État du jeu récupéré avec succès pour le lobby ${lobbyId}`);
 
       return {
         lobbyId,

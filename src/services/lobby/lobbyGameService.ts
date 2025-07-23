@@ -623,25 +623,16 @@ export class LobbyGameService {
       for (const player of players) {
         await LobbyModel.updatePlayerStatus(
           lobbyId,
-          player.userId,
+          player.id,
           APP_CONSTANTS.PLAYER_STATUS.JOINED
         );
-        await LobbyModel.updatePlayerScore(lobbyId, player.userId, 0);
-        await LobbyModel.updatePlayerProgress(lobbyId, player.userId, 0);
-        await LobbyModel.updatePlayerValidatedCountries(
+        await LobbyModel.updatePlayerGameData(
           lobbyId,
-          player.userId,
-          []
-        );
-        await LobbyModel.updatePlayerIncorrectCountries(
-          lobbyId,
-          player.userId,
-          []
-        );
-        await LobbyModel.updatePlayerCompletionTime(
-          lobbyId,
-          player.userId,
-          null
+          player.id,
+          0, // score
+          0, // progress
+          [], // validatedCountries
+          [] // incorrectCountries
         );
       }
 
