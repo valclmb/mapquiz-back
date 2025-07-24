@@ -101,12 +101,9 @@ export class WebSocketMessageHandler {
           );
           break;
 
-        case WS_MESSAGE_TYPES.SET_PLAYER_READY:
+        case "update_player_status":
           if (!this.requireAuth(userId, socket)) return;
-          result = await WebSocketController.handleSetPlayerReady(
-            payload,
-            userId!
-          );
+          result = await WebSocketController.handleUpdatePlayerStatus(payload, userId!);
           break;
 
         case WS_MESSAGE_TYPES.SET_PLAYER_ABSENT:
