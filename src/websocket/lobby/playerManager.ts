@@ -80,14 +80,6 @@ export class PlayerManager {
     const progress =
       totalQuestions > 0 ? (totalAnswered / totalQuestions) * 100 : 0;
 
-    console.log("PlayerManager.updatePlayerProgress - Calcul progression:", {
-      validatedCountries: validatedCountries.length,
-      incorrectCountries: incorrectCountries.length,
-      totalAnswered,
-      totalQuestions,
-      progress: Math.min(progress, 100),
-    });
-
     const updatedPlayer = {
       ...player,
       validatedCountries,
@@ -95,12 +87,6 @@ export class PlayerManager {
       score,
       progress: Math.min(progress, 100), // S'assurer que la progression ne dépasse pas 100%
     };
-
-    console.log(`🔍 PlayerManager.updatePlayerProgress - Statut préservé:`, {
-      playerId: player.name,
-      oldStatus: player.status,
-      newStatus: updatedPlayer.status,
-    });
 
     return updatedPlayer;
   }

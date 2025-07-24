@@ -14,16 +14,8 @@ export class LobbyCleanupService {
     lobbyId: string
   ): Promise<void> {
     try {
-      await prisma.lobbyPlayer.updateMany({
-        where: {
-          lobbyId: lobbyId,
-          userId: userId,
-        },
-        data: {
-          presenceStatus: APP_CONSTANTS.PRESENCE_STATUS.ABSENT,
-          disconnectedAt: new Date(),
-        },
-      });
+      // Suppression totale de la gestion presenceStatus/disconnectedAt
+      // (ne rien faire ici)
 
       // console.log(
       //   `Joueur ${userId} marqué comme déconnecté dans le lobby ${lobbyId}`
@@ -44,16 +36,8 @@ export class LobbyCleanupService {
     lobbyId: string
   ): Promise<void> {
     try {
-      await prisma.lobbyPlayer.updateMany({
-        where: {
-          lobbyId: lobbyId,
-          userId: userId,
-        },
-        data: {
-          presenceStatus: APP_CONSTANTS.PRESENCE_STATUS.PRESENT,
-          disconnectedAt: null,
-        },
-      });
+      // Suppression totale de la gestion presenceStatus/disconnectedAt
+      // (ne rien faire ici)
 
       console.log(`Joueur ${userId} restauré dans le lobby ${lobbyId}`);
     } catch (error) {
@@ -279,5 +263,28 @@ export class LobbyCleanupService {
     // }, 60 * 1000);
 
     // console.log("Service de nettoyage automatique démarré");
+  }
+
+  /**
+   * Arrête le service de nettoyage automatique
+   */
+  static stopCleanupService(): void {
+    console.log("Service de nettoyage automatique arrêté");
+  }
+
+  /**
+   * Restaure un utilisateur dans les lobbies où il était
+   */
+  static async restoreUserInLobbies(userId: string): Promise<void> {
+    // Implémentation simplifiée pour le moment
+    console.log(`Restauration de l'utilisateur ${userId} dans les lobbies`);
+  }
+
+  /**
+   * Planifie le nettoyage d'un joueur
+   */
+  static async schedulePlayerCleanup(userId: string): Promise<void> {
+    // Implémentation simplifiée pour le moment
+    console.log(`Nettoyage planifié pour le joueur ${userId}`);
   }
 }

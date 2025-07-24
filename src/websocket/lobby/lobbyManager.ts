@@ -120,10 +120,13 @@ export async function updatePlayerStatus(
 // Démarrer une partie
 export async function startGame(lobbyId: string) {
   console.log("🚀 LobbyManager.startGame - DÉBUT pour le lobby:", lobbyId);
-  
+
   const lobby = activeLobbies.get(lobbyId);
   if (!lobby) {
-    console.log("❌ LobbyManager.startGame - Lobby non trouvé en mémoire:", lobbyId);
+    console.log(
+      "❌ LobbyManager.startGame - Lobby non trouvé en mémoire:",
+      lobbyId
+    );
     return false;
   }
 
@@ -141,26 +144,11 @@ export async function startGame(lobbyId: string) {
     );
   }
 
-  // Générer les pays pour la partie
-  console.log(
-    "LobbyManager.startGame - génération des pays avec settings:",
-    lobby.settings
-  );
-  const countries = await GameStateManager.generateCountriesForGame(
-    lobby.settings
-  );
-  console.log("LobbyManager.startGame - pays générés:", {
-    count: countries.length,
-    firstCountry: countries[0],
-  });
-
-  // Ajouter totalQuestions aux settings
-  lobby.settings.totalQuestions = countries.length;
+  // --- SUPPRESSION DE TOUTE LOGIQUE COUNTRIES ---
 
   lobby.status = "playing";
   lobby.gameState = {
     startTime: Date.now(),
-    countries: countries,
     settings: {
       selectedRegions: lobby.settings.selectedRegions || [],
     },
@@ -168,7 +156,6 @@ export async function startGame(lobbyId: string) {
 
   console.log("LobbyManager.startGame - gameState créé:", {
     startTime: lobby.gameState.startTime,
-    countriesCount: lobby.gameState.countries.length,
     settings: lobby.gameState.settings,
   });
 
@@ -447,7 +434,7 @@ async function endGame(lobbyId: string) {
   }
 
   console.log("LobbyManager.endGame - Fin de jeu, rankings:", rankings);
-  BroadcastManager.broadcastGameResults(lobbyId, rankings);
+  BroadcastManager.broadcastGameEnd(lobbyId);
   // Diffuser un lobby_update avec le status finished pour synchroniser le frontend
   await BroadcastManager.broadcastLobbyUpdate(lobbyId, lobby);
 }
@@ -560,7 +547,6 @@ export function getGameState(lobbyId: string, userId: string) {
     settings: lobby.settings,
     players,
     startTime: lobby.gameState?.startTime,
-    countries: lobby.gameState?.countries,
     // Ajoute ici d'autres champs de gameState si besoin
   };
 }
@@ -623,6 +609,24 @@ export async function restartLobby(lobbyId: string) {
       incorrectCountries: [],
       completionTime: null,
     });
+
+    // PATCH: Remettre à zéro en base de données aussi
+    try {
+      const { updatePlayerGameData } = await import(
+        "../../models/lobbyModel.js"
+      );
+      await updatePlayerGameData(
+        lobbyId,
+        playerId,
+        0, // score
+        0, // progress
+        [], // validatedCountries
+        [], // incorrectCountries
+        "joined" // status
+      );
+    } catch (error) {
+      console.error(`Erreur lors du reset du joueur ${playerId} en DB:`, error);
+    }
   }
 
   // Diffuser la mise à jour du lobby

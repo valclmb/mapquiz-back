@@ -1,5 +1,6 @@
 import * as FriendService from "../services/friendService.js";
 import { LobbyService } from "../services/lobbyService.js";
+import { updatePlayerStatus as updatePlayerStatusInLobby } from "../websocket/lobby/lobbyManager.js";
 
 export const handleSendFriendRequest = async (payload: any, userId: string) => {
   const { receiverTag } = payload;
@@ -52,11 +53,6 @@ export const handleUpdateLobbySettings = async (
   return await LobbyService.updateLobbySettings(userId, lobbyId, settings);
 };
 
-export const handleSetPlayerReady = async (payload: any, userId: string) => {
-  const { lobbyId, ready } = payload;
-  return await LobbyService.setPlayerReady(userId, lobbyId, ready);
-};
-
 export const handleStartGame = async (payload: any, userId: string) => {
   const { lobbyId } = payload;
   return await LobbyService.startGame(userId, lobbyId);
@@ -100,4 +96,13 @@ export const handleUpdatePlayerProgress = async (
 export const handleLeaveGame = async (payload: any, userId: string) => {
   const { lobbyId } = payload;
   return await LobbyService.leaveGame(userId, lobbyId);
+};
+
+export const handleUpdatePlayerStatus = async (
+  payload: any,
+  userId: string
+) => {
+  const { lobbyId, status } = payload;
+  if (!lobbyId || !status) throw new Error("lobbyId et status requis");
+  return await updatePlayerStatusInLobby(lobbyId, userId, status);
 };

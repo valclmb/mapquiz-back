@@ -333,65 +333,9 @@ export class LobbyPlayerService {
       return { changed: false };
     }
 
-    // Vérifier le statut actuel avant de faire la mise à jour
-    const currentPresenceStatus = player.presenceStatus;
-    const newPresenceStatus = absent
-      ? APP_CONSTANTS.PRESENCE_STATUS.ABSENT
-      : APP_CONSTANTS.PRESENCE_STATUS.PRESENT;
-
-    // Ne faire la mise à jour que si le statut change
-    if (currentPresenceStatus !== newPresenceStatus) {
-      // Gérer la présence physique avec presenceStatus
-      if (absent) {
-        // Marquer comme absent
-        await LobbyModel.updatePlayerPresenceStatus(
-          validatedLobbyId,
-          validatedUserId,
-          APP_CONSTANTS.PRESENCE_STATUS.ABSENT
-        );
-      } else {
-        // Marquer comme présent
-        await LobbyModel.updatePlayerPresenceStatus(
-          validatedLobbyId,
-          validatedUserId,
-          APP_CONSTANTS.PRESENCE_STATUS.PRESENT
-        );
-      }
-
-      console.log(
-        `Joueur ${validatedUserId} marqué comme ${absent ? "absent" : "présent"} dans le lobby ${validatedLobbyId}`
-      );
-    } else {
-      // Log silencieux pour éviter la pollution des logs
-      return { changed: false };
-    }
-
-    // Gérer la mémoire selon la présence
-    if (absent) {
-      // Si le joueur est absent, le retirer de la mémoire (sans supprimer le lobby)
-      LobbyManager.removeDisconnectedPlayerFromLobby(
-        validatedLobbyId,
-        validatedUserId
-      );
-    } else {
-      // Si le joueur revient, le remettre en mémoire
-      const lobbyInMemory = LobbyManager.getLobbyInMemory(validatedLobbyId);
-      if (lobbyInMemory && !lobbyInMemory.players.has(validatedUserId)) {
-        // Si le joueur n'est pas en mémoire, l'ajouter
-        const user = await UserModel.findUserById(validatedUserId);
-        if (user) {
-          LobbyManager.addPlayerToLobby(
-            validatedLobbyId,
-            validatedUserId,
-            user.name
-          );
-        }
-      }
-      // Note: On ne change pas le statut de jeu (joined/ready/playing) ici
-      // car on gère seulement la présence physique
-    }
-
-    return { changed: true };
+    // Suppression totale de la gestion presenceStatus/disconnectedAt
+    // (ne rien faire ici)
+    return { changed: false };
   }
 
   /**
@@ -424,36 +368,8 @@ export class LobbyPlayerService {
       throw new LobbyError("Joueur non trouvé dans le lobby");
     }
 
-    // Déterminer le nouveau statut basé sur la présence
-    let newStatus: string;
-    if (present) {
-      // Si le joueur devient présent, le remettre en "joined" s'il était "disconnected"
-      newStatus = player.status === "disconnected" ? "joined" : player.status;
-    } else {
-      // Si le joueur devient absent, le marquer comme "disconnected"
-      newStatus = "disconnected";
-    }
-
-    // Mettre à jour le statut en base de données
-    await LobbyModel.updatePlayerStatus(
-      validatedLobbyId,
-      validatedUserId,
-      newStatus
-    );
-
-    // Mettre à jour le statut en mémoire
-    const lobbyInMemory = LobbyManager.getLobbyInMemory(validatedLobbyId);
-    if (lobbyInMemory && lobbyInMemory.players.has(validatedUserId)) {
-      LobbyManager.updatePlayerStatus(
-        validatedLobbyId,
-        validatedUserId,
-        newStatus
-      );
-    }
-
-    console.log(
-      `LobbyPlayerService.setPlayerPresent - Joueur ${userId} ${present ? "présent" : "absent"} dans le lobby ${lobbyId}`
-    );
+    // Suppression totale de la gestion presenceStatus/disconnectedAt
+    // (ne rien faire ici)
   }
 
   /**
@@ -520,36 +436,11 @@ export class LobbyPlayerService {
     // );
 
     const players = await this.getLobbyPlayers(lobbyId);
-    // console.log(
-    //   `areAllPlayersReady - Joueurs récupérés:`,
-    //   players.map((p: any) => ({
-    //     id: p.id,
-    //     name: p.name || "Unknown",
-    //     status: p.status,
-    //     presenceStatus: p.presenceStatus,
-    //   }))
-    // );
 
-    // Filtrer seulement les joueurs présents
-    const presentPlayers = players.filter(
-      (p) => p.presenceStatus === APP_CONSTANTS.PRESENCE_STATUS.PRESENT
-    );
-
-    // Vérifier qu'il y a au moins 1 joueur présent (permettre les parties solo)
-    if (presentPlayers.length < 1) {
-      console.log(
-        `areAllPlayersReady - Pas assez de joueurs présents: ${presentPlayers.length} (minimum 1 requis)`
-      );
-      return false;
-    }
-
-    // Vérifier que tous les joueurs présents sont prêts
-    const allReady = presentPlayers.every(
+    // Nouveau code :
+    if (players.length < 1) return false;
+    const allReady = players.every(
       (p) => p.status === APP_CONSTANTS.PLAYER_STATUS.READY
-    );
-
-    console.log(
-      `areAllPlayersReady - Joueurs présents: ${presentPlayers.length}, tous prêts: ${allReady}`
     );
 
     return allReady;

@@ -100,7 +100,6 @@ export async function playerManagementRoutes(fastify: FastifyInstance) {
           disconnectedPlayers: disconnectedPlayers.map((player) => ({
             id: player.user.id,
             name: player.user.name,
-            disconnectedAt: player.disconnectedAt,
           })),
         };
       } catch (error) {

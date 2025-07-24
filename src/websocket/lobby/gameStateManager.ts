@@ -1,4 +1,5 @@
-import { getCountries } from "../../lib/countryService.js";
+// SUPPRESSION TOTALE DE LA LOGIQUE COUNTRIES
+// Ce fichier ne gère plus rien concernant les pays.
 
 // Type pour les données de progression d'un joueur
 export type PlayerProgress = {
@@ -12,39 +13,10 @@ export type PlayerProgress = {
   consecutiveCorrect?: number;
 };
 
-// Type pour l'état du jeu
-export type GameState = {
-  startTime: number;
-  countries: any[];
-  settings: {
-    selectedRegions: string[];
-  };
-};
-
 /**
  * Gestionnaire de l'état du jeu
  */
 export class GameStateManager {
-  /**
-   * Génère les pays pour la partie en fonction des paramètres
-   */
-  static async generateCountriesForGame(settings: any): Promise<any[]> {
-    const selectedRegions = settings.selectedRegions || [];
-
-    // Récupérer tous les pays
-    const allCountries = await getCountries();
-
-    // Marquer les pays comme filtrés s'ils ne sont pas dans les régions sélectionnées
-    const countriesWithFiltered = allCountries.map((country) => ({
-      ...country,
-      filtered:
-        selectedRegions.length > 0 &&
-        !selectedRegions.includes(country.properties.continent),
-    }));
-
-    return this.shuffleArray(countriesWithFiltered);
-  }
-
   /**
    * Vérifie si un joueur a terminé la partie
    */
