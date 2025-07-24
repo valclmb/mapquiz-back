@@ -142,6 +142,10 @@ export class BroadcastManager {
       settings: lobbyData.gameState?.settings,
     });
 
+    // On retire countries de gameState avant d'envoyer
+    const { countries, ...gameStateWithoutCountries } =
+      lobbyData.gameState || {};
+
     const message = {
       type: "game_start",
       data: {
@@ -149,7 +153,7 @@ export class BroadcastManager {
         startTime: lobbyData.gameState.startTime,
         totalQuestions: lobbyData.settings.totalQuestions,
         settings: lobbyData.gameState.settings,
-        gameState: lobbyData.gameState, // Ajouter l'état complet du jeu
+        gameState: gameStateWithoutCountries, // n’envoie plus les pays
       },
     };
 
