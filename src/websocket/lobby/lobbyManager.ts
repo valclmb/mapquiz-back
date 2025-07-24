@@ -434,7 +434,7 @@ async function endGame(lobbyId: string) {
   }
 
   console.log("LobbyManager.endGame - Fin de jeu, rankings:", rankings);
-  BroadcastManager.broadcastGameResults(lobbyId, rankings);
+  BroadcastManager.broadcastGameEnd(lobbyId);
   // Diffuser un lobby_update avec le status finished pour synchroniser le frontend
   await BroadcastManager.broadcastLobbyUpdate(lobbyId, lobby);
 }

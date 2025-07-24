@@ -192,14 +192,14 @@ export class BroadcastManager {
   }
 
   /**
-   * Diffuse les résultats finaux du jeu
+   * Diffuse la fin de partie à tous les joueurs
    */
-  static broadcastGameResults(lobbyId: string, rankings: any[]): void {
+  static broadcastGameEnd(lobbyId: string): void {
     const message = {
-      type: "game_results",
+      type: "game_end",
       payload: {
         lobbyId,
-        rankings,
+        // message: "La partie est terminée" // optionnel
       },
     };
 
@@ -246,42 +246,6 @@ export class BroadcastManager {
     for (const [playerId] of lobbyData.players) {
       sendToUser(playerId, message);
     }
-  }
-
-  /**
-   * Diffuse la fin de partie avec les classements
-   */
-  static broadcastGameEnd(lobbyId: string, rankings: any[]): void {
-    const message = {
-      type: "game_end",
-      data: {
-        lobbyId,
-        rankings,
-        endTime: Date.now(),
-      },
-    };
-
-    // Envoyer à tous les joueurs qui étaient dans le lobby
-    for (const ranking of rankings) {
-      sendToUser(ranking.id, message);
-    }
-  }
-
-  /**
-   * Envoie un message spécifique à un joueur
-   */
-  static sendToPlayer(playerId: string, message: any): boolean {
-    return sendToUser(playerId, message);
-  }
-
-  /**
-   * Envoie un message d'erreur à un joueur
-   */
-  static sendErrorToPlayer(playerId: string, errorMessage: string): boolean {
-    return sendToUser(playerId, {
-      type: "error",
-      message: errorMessage,
-    });
   }
 
   /**
