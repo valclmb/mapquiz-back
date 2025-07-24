@@ -43,46 +43,24 @@ export class BroadcastManager {
       ),
     });
 
-    // Séparer les joueurs actifs et absents
-    const activePlayers = allLobbyPlayers
-      .filter((player: any) => player.presenceStatus === "present")
-      .map((player: any) => {
-        // Utiliser les données de la mémoire si disponibles, sinon utiliser la DB
-        const memoryPlayer = lobbyData.players.get(player.user.id);
-        return {
-          id: player.user.id,
-          name: player.user.name,
-          status: memoryPlayer ? memoryPlayer.status : player.status,
-          score: memoryPlayer ? memoryPlayer.score : player.score || 0,
-          progress: memoryPlayer ? memoryPlayer.progress : player.progress || 0,
-          validatedCountries: memoryPlayer
-            ? memoryPlayer.validatedCountries
-            : player.validatedCountries || [],
-          incorrectCountries: memoryPlayer
-            ? memoryPlayer.incorrectCountries
-            : player.incorrectCountries || [],
-          isDisconnected: false,
-          disconnectedAt: null,
-        };
-      });
-
-    // Récupérer les joueurs absents depuis les données déjà récupérées
-    const absentPlayersData = allLobbyPlayers
-      .filter((player: any) => player.presenceStatus === "absent")
-      .map((player: any) => ({
+    // Dans broadcastLobbyUpdate, simplifie la récupération des joueurs :
+    const allPlayers = allLobbyPlayers.map((player: any) => {
+      const memoryPlayer = lobbyData.players.get(player.user.id);
+      return {
         id: player.user.id,
         name: player.user.name,
-        status: player.status,
-        score: player.score || 0,
-        progress: player.progress || 0,
-        validatedCountries: player.validatedCountries || [],
-        incorrectCountries: player.incorrectCountries || [],
-        isPresentInLobby: false,
-        leftLobbyAt: player.disconnectedAt,
-      }));
-
-    // Combiner les joueurs actifs et absents
-    const allPlayers = [...activePlayers, ...absentPlayersData];
+        status: memoryPlayer ? memoryPlayer.status : player.status,
+        score: memoryPlayer ? memoryPlayer.score : player.score || 0,
+        progress: memoryPlayer ? memoryPlayer.progress : player.progress || 0,
+        validatedCountries: memoryPlayer
+          ? memoryPlayer.validatedCountries
+          : player.validatedCountries || [],
+        incorrectCountries: memoryPlayer
+          ? memoryPlayer.incorrectCountries
+          : player.incorrectCountries || [],
+        // isDisconnected, leftLobbyAt, presenceStatus supprimés
+      };
+    });
 
     try {
       const message = {
@@ -92,7 +70,7 @@ export class BroadcastManager {
           players: allPlayers,
           hostId: lobbyData.hostId,
           settings: lobbyData.settings,
-          status: lobbyData.status || "waiting", // Fallback si status est undefined
+          status: lobbyData.status || "waiting",
         },
       };
 
@@ -100,7 +78,6 @@ export class BroadcastManager {
         type: message.type,
         payload: message.payload,
         playersCount: allPlayers.length,
-        absentCount: absentPlayersData.length,
       });
 
       // Diffuser à tous les joueurs du lobby
@@ -118,7 +95,7 @@ export class BroadcastManager {
         type: "lobby_update",
         payload: {
           lobbyId,
-          players: activePlayers,
+          players: allPlayers,
           hostId: lobbyData.hostId,
           settings: lobbyData.settings,
           status: lobbyData.status || "waiting",

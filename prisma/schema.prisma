@@ -151,13 +151,12 @@ model LobbyPlayer {
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   status    String   @default("joined") // joined, ready, playing
-  presenceStatus String @default("present") // present, absent
   score     Int      @default(0)
   progress  Int      @default(0)
   validatedCountries String[] @default([])
   incorrectCountries String[] @default([])
   joinedAt  DateTime @default(now())
-  disconnectedAt DateTime? // Timestamp de déconnexion pour la suppression différée
+  // presenceStatus et disconnectedAt supprimés
 
   @@unique([lobbyId, userId])
   @@map("lobby_player")
