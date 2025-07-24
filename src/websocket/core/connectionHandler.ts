@@ -12,6 +12,7 @@ import { addConnection, removeConnection } from "./connectionManager.js";
  */
 export class WebSocketConnectionHandler {
   private static restoredUsers = new Set<string>(); // Cache pour éviter les restaurations multiples
+  private static recentlyDisconnectedUsers = new Set<string>(); // Cache pour éviter les déconnexions multiples
   /**
    * Gère l'établissement d'une nouvelle connexion
    */
@@ -179,17 +180,76 @@ export class WebSocketConnectionHandler {
           // Mettre à jour l'activité du lobby
           await LobbyCleanupService.updateLobbyActivity(lobby.id);
 
-          // Restaurer l'utilisateur dans le lobby en mémoire
+          // Marquer le joueur comme présent
+          const player = await LobbyModel.getPlayerInLobby(lobby.id, userId);
+          if (player && player.presenceStatus === "absent") {
+            await LobbyModel.updatePlayerPresenceStatus(
+              lobby.id,
+              userId,
+              "present"
+            );
+            console.log(
+              `Joueur ${userId} marqué comme présent dans le lobby ${lobby.id}`
+            );
+          }
+
+          // Restaurer l'utilisateur dans le lobby en mémoire avec ses données complètes
           if (!lobbyInMemory.players.has(userId)) {
             console.log(
-              `Ajout de l'utilisateur ${userId} au lobby ${lobby.id} en mémoire`
+              `Ajout de l'utilisateur ${userId} au lobby ${lobby.id} en mémoire avec restauration des données`
             );
-            LobbyManager.addPlayerToLobby(lobby.id, userId, user.name);
+
+            // Récupérer les données complètes du joueur depuis la base de données
+            const playerData = await LobbyModel.getPlayerInLobby(
+              lobby.id,
+              userId
+            );
+            console.log(`🔍 Restauration - Données récupérées de la DB:`, {
+              userId,
+              status: playerData?.status,
+              score: playerData?.score,
+              progress: playerData?.progress,
+            });
+
+            if (playerData) {
+              // Restaurer le joueur avec ses données complètes
+              lobbyInMemory.players.set(userId, {
+                name: user.name,
+                status: playerData.status || "joined",
+                score: playerData.score || 0,
+                progress: playerData.progress || 0,
+                validatedCountries: playerData.validatedCountries || [],
+                incorrectCountries: playerData.incorrectCountries || [],
+              });
+
+              console.log(
+                `✅ Joueur ${userId} restauré avec statut: ${playerData.status}, score: ${playerData.score}, progress: ${playerData.progress}`
+              );
+            } else {
+              // Si pas de données en DB, créer un joueur par défaut sans diffuser
+              console.log(
+                `Aucune donnée trouvée en DB pour ${userId}, création d'un joueur par défaut`
+              );
+              lobbyInMemory.players.set(userId, {
+                name: user.name,
+                status: "joined",
+                score: 0,
+                progress: 0,
+                validatedCountries: [],
+                incorrectCountries: [],
+              });
+            }
           } else {
             console.log(
               `Utilisateur ${userId} déjà présent dans le lobby ${lobby.id} en mémoire`
             );
           }
+
+          // Diffuser la mise à jour du lobby après restauration
+          const { BroadcastManager } = await import(
+            "../lobby/broadcastManager.js"
+          );
+          await BroadcastManager.broadcastLobbyUpdate(lobby.id, lobbyInMemory);
         } catch (error) {
           console.error(
             `Erreur lors de la restauration de l'utilisateur ${userId} dans le lobby ${lobby.id}:`,
@@ -209,13 +269,27 @@ export class WebSocketConnectionHandler {
    * Gère la déconnexion d'un joueur des lobbies
    */
   private static async handlePlayerDisconnect(userId: string): Promise<void> {
+    // Éviter les déconnexions multiples rapides
+    if (this.recentlyDisconnectedUsers.has(userId)) {
+      console.log(
+        `Joueur ${userId} déjà marqué comme déconnecté récemment, ignoré`
+      );
+      return;
+    }
+
+    // Ajouter à la liste des déconnexions récentes
+    this.recentlyDisconnectedUsers.add(userId);
+    setTimeout(() => {
+      this.recentlyDisconnectedUsers.delete(userId);
+    }, 5000); // 5 secondes
+
     try {
       // Trouver tous les lobbies où le joueur était présent
       const playerLobbies = await LobbyModel.getLobbiesByPlayer(userId);
 
       for (const lobby of playerLobbies) {
         try {
-          console.log(`Joueur ${userId} déconnecté du lobby ${lobby.id}`);
+          // console.log(`Joueur ${userId} déconnecté du lobby ${lobby.id}`);
 
           // Marquer le joueur comme déconnecté en base de données
           await LobbyCleanupService.markPlayerAsDisconnected(userId, lobby.id);
@@ -230,9 +304,9 @@ export class WebSocketConnectionHandler {
             // Il sera restauré lors de la reconnexion
           }
 
-          console.log(
-            `Joueur ${userId} marqué comme déconnecté du lobby ${lobby.id} (déconnexion temporaire)`
-          );
+          // console.log(
+          //   `Joueur ${userId} marqué comme déconnecté du lobby ${lobby.id} (déconnexion temporaire)`
+          // );
         } catch (error) {
           console.error(
             `Erreur lors de la gestion de la déconnexion du joueur ${userId} du lobby ${lobby.id}:`,

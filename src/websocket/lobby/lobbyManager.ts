@@ -12,6 +12,7 @@ export function createLobby(
   hostName: string,
   settings: any
 ) {
+  console.log(`Création du lobby ${lobbyId} en mémoire avec l'hôte ${hostId}`);
   activeLobbies.set(lobbyId, {
     players: new Map([[hostId, PlayerManager.createPlayer(hostName)]]),
     hostId: hostId,
@@ -62,6 +63,18 @@ export async function updatePlayerStatus(
     PlayerManager.updatePlayerStatus(playerData, status)
   );
 
+  // Sauvegarder le statut en base de données
+  try {
+    const { updatePlayerStatus } = await import("../../models/lobbyModel.js");
+    await updatePlayerStatus(lobbyId, playerId, status);
+    console.log(`Statut sauvegardé en DB pour ${playerId}: ${status}`);
+  } catch (error) {
+    console.error(
+      `Erreur lors de la sauvegarde du statut en DB pour ${playerId}:`,
+      error
+    );
+  }
+
   // Toujours diffuser la mise à jour du lobby
   await BroadcastManager.broadcastLobbyUpdate(lobbyId, lobby);
 
@@ -106,10 +119,15 @@ export async function updatePlayerStatus(
 
 // Démarrer une partie
 export async function startGame(lobbyId: string) {
+  console.log("🚀 LobbyManager.startGame - DÉBUT pour le lobby:", lobbyId);
+  
   const lobby = activeLobbies.get(lobbyId);
-  if (!lobby) return false;
+  if (!lobby) {
+    console.log("❌ LobbyManager.startGame - Lobby non trouvé en mémoire:", lobbyId);
+    return false;
+  }
 
-  console.log("LobbyManager.startGame - début pour le lobby:", lobbyId);
+  console.log("✅ LobbyManager.startGame - Lobby trouvé, début du traitement");
 
   // Mettre à jour le statut du lobby en base de données
   try {
@@ -162,6 +180,48 @@ export async function startGame(lobbyId: string) {
     Array.from(lobby.players.keys())
   );
 
+  // Mettre à jour le statut "playing" de tous les joueurs en mémoire ET en base de données
+  try {
+    console.log(
+      `🔍 startGame - Joueurs avant mise à jour:`,
+      Array.from(lobby.players.entries()).map((entry: any) => ({
+        id: entry[0],
+        status: entry[1].status,
+      }))
+    );
+
+    for (const [playerId, playerData] of lobby.players) {
+      console.log(
+        `🔍 startGame - Mise à jour du joueur ${playerId} de ${playerData.status} vers playing`
+      );
+
+      // Mettre à jour en mémoire
+      lobby.players.set(
+        playerId,
+        PlayerManager.updatePlayerStatus(playerData, "playing")
+      );
+
+      // Mettre à jour en base de données
+      const { updatePlayerStatus } = await import("../../models/lobbyModel.js");
+      await updatePlayerStatus(lobbyId, playerId, "playing");
+
+      console.log(`✅ startGame - Joueur ${playerId} mis à jour vers playing`);
+    }
+
+    console.log(
+      `🔍 startGame - Joueurs après mise à jour:`,
+      Array.from(lobby.players.entries()).map((entry: any) => ({
+        id: entry[0],
+        status: entry[1].status,
+      }))
+    );
+    console.log(
+      `Statut "playing" mis à jour en mémoire et en DB pour tous les joueurs du lobby ${lobbyId}`
+    );
+  } catch (error) {
+    console.error(`Erreur lors de la mise à jour du statut "playing":`, error);
+  }
+
   // Sauvegarder l'état du jeu en base de données
   try {
     const { saveGameState } = await import("../../models/lobbyModel.js");
@@ -190,7 +250,7 @@ export async function startGame(lobbyId: string) {
 }
 
 // Mettre à jour le score d'un joueur
-export function updatePlayerScore(
+export async function updatePlayerScore(
   lobbyId: string,
   playerId: string,
   score: number,
@@ -212,6 +272,25 @@ export function updatePlayerScore(
 
   lobby.players.set(playerId, updatedPlayer);
 
+  // Sauvegarder en base de données
+  try {
+    const { updatePlayerGameData } = await import("../../models/lobbyModel.js");
+    await updatePlayerGameData(
+      lobbyId,
+      playerId,
+      updatedPlayer.score,
+      updatedPlayer.progress,
+      updatedPlayer.validatedCountries || [],
+      updatedPlayer.incorrectCountries || [],
+      updatedPlayer.status
+    );
+  } catch (error) {
+    console.error(
+      `Erreur lors de la sauvegarde du score en DB pour ${playerId}:`,
+      error
+    );
+  }
+
   // Vérifier si le joueur a terminé la partie
   if (updatedPlayer.progress >= 100) {
     console.log(
@@ -225,7 +304,7 @@ export function updatePlayerScore(
 }
 
 // Mettre à jour la progression détaillée du joueur
-export function updatePlayerProgress(
+export async function updatePlayerProgress(
   lobbyId: string,
   playerId: string,
   validatedCountries: string[],
@@ -237,6 +316,13 @@ export function updatePlayerProgress(
   if (!lobby || !lobby.players.has(playerId)) return false;
 
   const playerData = lobby.players.get(playerId);
+  console.log(`🔍 updatePlayerProgress - Statut du joueur avant mise à jour:`, {
+    playerId,
+    currentStatus: playerData?.status,
+    currentScore: playerData?.score,
+    currentProgress: playerData?.progress,
+  });
+
   const updatedPlayer = PlayerManager.updatePlayerProgress(
     playerData,
     validatedCountries,
@@ -246,6 +332,36 @@ export function updatePlayerProgress(
   );
 
   lobby.players.set(playerId, updatedPlayer);
+
+  // Sauvegarder en base de données
+  try {
+    const { updatePlayerGameData } = await import("../../models/lobbyModel.js");
+    console.log(`🔍 updatePlayerProgress - Avant sauvegarde DB:`, {
+      playerId,
+      status: updatedPlayer.status,
+      score: updatedPlayer.score,
+      progress: updatedPlayer.progress,
+    });
+
+    await updatePlayerGameData(
+      lobbyId,
+      playerId,
+      updatedPlayer.score,
+      updatedPlayer.progress,
+      updatedPlayer.validatedCountries,
+      updatedPlayer.incorrectCountries,
+      updatedPlayer.status
+    );
+
+    console.log(
+      `✅ updatePlayerProgress - Après sauvegarde DB: status=${updatedPlayer.status}`
+    );
+  } catch (error) {
+    console.error(
+      `❌ Erreur lors de la sauvegarde de la progression en DB pour ${playerId}:`,
+      error
+    );
+  }
 
   // Vérifier si le joueur a terminé la partie
   if (updatedPlayer.progress >= 100) {
@@ -338,6 +454,7 @@ async function endGame(lobbyId: string) {
 
 // Supprimer un lobby
 export function removeLobby(lobbyId: string) {
+  console.log(`Suppression du lobby ${lobbyId} de la mémoire`);
   activeLobbies.delete(lobbyId);
 }
 
@@ -364,7 +481,10 @@ export async function removePlayerFromLobby(lobbyId: string, playerId: string) {
 }
 
 // Retirer un joueur déconnecté du lobby (sans supprimer le lobby)
-export async function removeDisconnectedPlayerFromLobby(lobbyId: string, playerId: string) {
+export async function removeDisconnectedPlayerFromLobby(
+  lobbyId: string,
+  playerId: string
+) {
   const lobby = activeLobbies.get(lobbyId);
   if (!lobby) return false;
 
@@ -379,7 +499,14 @@ export async function removeDisconnectedPlayerFromLobby(lobbyId: string, playerI
 
 // Récupérer un lobby en mémoire (sans vérification d'utilisateur)
 export function getLobbyInMemory(lobbyId: string) {
-  return activeLobbies.get(lobbyId) || null;
+  const lobby = activeLobbies.get(lobbyId);
+  if (!lobby) {
+    console.log(
+      `Lobby ${lobbyId} non trouvé en mémoire. Lobbies actifs:`,
+      Array.from(activeLobbies.keys())
+    );
+  }
+  return lobby || null;
 }
 
 // Récupérer l'état du jeu
@@ -449,11 +576,11 @@ export function restoreLobbyFromDatabase(lobbyId: string, lobbyData: any) {
   const players = new Map();
   if (lobbyData.players && Array.isArray(lobbyData.players)) {
     lobbyData.players.forEach((player: any) => {
-      players.set(player.id, {
+      players.set(player.userId, {
         status: player.status,
         score: player.score || 0,
         progress: player.progress || 0,
-        name: player.name,
+        name: player.user.name,
         validatedCountries: player.validatedCountries || [],
         incorrectCountries: player.incorrectCountries || [],
       });

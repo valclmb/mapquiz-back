@@ -73,7 +73,7 @@ export class LobbyService {
     userId: string,
     lobbyId: string,
     absent: boolean
-  ) {
+  ): Promise<{ changed: boolean }> {
     return await LobbyPlayerService.setPlayerAbsent(userId, lobbyId, absent);
   }
 

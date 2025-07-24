@@ -147,7 +147,7 @@ export class LobbyGameService {
       const progress = totalQuestions > 0 ? (score / totalQuestions) * 100 : 0;
 
       // Mettre à jour le score et la progression en mémoire
-      const updated = LobbyManager.updatePlayerScore(
+      const updated = await LobbyManager.updatePlayerScore(
         lobbyId,
         userId,
         validatedData.score,
@@ -202,7 +202,7 @@ export class LobbyGameService {
       await LobbyPlayerService.verifyPlayerInLobby(userId, lobbyId);
 
       // Mettre à jour la progression détaillée en mémoire
-      const updated = LobbyManager.updatePlayerProgress(
+      const updated = await LobbyManager.updatePlayerProgress(
         lobbyId,
         userId,
         validatedData.validatedCountries,
@@ -217,6 +217,8 @@ export class LobbyGameService {
         );
         throw new LobbyError("Joueur non trouvé dans le lobby");
       }
+
+      // La sauvegarde en base de données est maintenant gérée par LobbyManager.updatePlayerProgress
 
       return { success: true };
     } catch (error) {
@@ -335,10 +337,12 @@ export class LobbyGameService {
         status: lobby.status,
         hostId: lobby.hostId,
         playersCount: lobby.players.length,
+        authorizedPlayers: lobby.authorizedPlayers,
         players: lobby.players.map((p) => ({
           id: p.userId,
           name: p.user.name,
           status: p.status,
+          presenceStatus: p.presenceStatus,
         })),
       });
 
@@ -396,7 +400,7 @@ export class LobbyGameService {
           score: p.score,
           progress: p.progress,
           status: p.status,
-          isDisconnected: p.status === "disconnected",
+          isPresentInLobby: p.presenceStatus === "present",
           disconnectedAt: p.disconnectedAt,
         }));
 
@@ -419,10 +423,10 @@ export class LobbyGameService {
         Array.from(lobbyInMemory.players.keys())
       );
 
-            // Retourner l'état complet du lobby (sans les pays)
+      // Retourner l'état complet du lobby (sans les pays)
       const players = [];
       const playerIdsInMemory = new Set();
-      
+
       // D'abord, ajouter tous les joueurs en mémoire
       for (const [playerId, playerData] of lobbyInMemory.players.entries()) {
         playerIdsInMemory.add(playerId);
@@ -432,26 +436,27 @@ export class LobbyGameService {
           score: playerData.score,
           progress: playerData.progress,
           status: playerData.status,
-          isDisconnected: playerData.status === "disconnected",
-          disconnectedAt: null, // Les joueurs en mémoire ne sont pas déconnectés
+          isPresentInLobby: true, // Les joueurs en mémoire sont présents dans le lobby
+          leftLobbyAt: null,
         });
       }
 
-      // Ensuite, ajouter les joueurs déconnectés depuis la base de données
-      // qui ne sont PAS déjà en mémoire (même s'ils sont déconnectés)
-      const disconnectedPlayers = lobby.players.filter(
-        (p) => p.status === "disconnected" && !playerIdsInMemory.has(p.userId)
+      // Ensuite, ajouter TOUS les joueurs depuis la base de données
+      // qui ne sont PAS déjà en mémoire (qu'ils soient présents ou absents)
+      const dbPlayers = lobby.players.filter(
+        (p) => !playerIdsInMemory.has(p.userId)
       );
-      
-      for (const player of disconnectedPlayers) {
+
+      for (const player of dbPlayers) {
         players.push({
           id: player.userId,
           name: player.user.name,
           score: player.score,
           progress: player.progress,
           status: player.status,
-          isDisconnected: true,
-          disconnectedAt: player.disconnectedAt,
+          isPresentInLobby: player.presenceStatus === "present",
+          leftLobbyAt:
+            player.presenceStatus === "absent" ? player.disconnectedAt : null,
         });
       }
 
@@ -469,6 +474,13 @@ export class LobbyGameService {
           lobbyId: result.lobbyId,
           status: result.status,
           playersCount: result.players.length,
+          players: result.players.map((p) => ({
+            id: p.id,
+            name: p.name,
+            status: p.status,
+            isPresentInLobby: p.isPresentInLobby,
+            leftLobbyAt: p.leftLobbyAt,
+          })),
         }
       );
 
@@ -532,11 +544,11 @@ export class LobbyGameService {
           players: lobby.players.map((p) => ({
             id: p.userId,
             name: p.user.name,
-            score: p.score,
-            progress: p.progress,
-            status: p.status,
-            validatedCountries: p.validatedCountries,
-            incorrectCountries: p.incorrectCountries,
+            score: p.score || 0,
+            progress: p.progress || 0,
+            status: p.status || "joined",
+            validatedCountries: p.validatedCountries || [],
+            incorrectCountries: p.incorrectCountries || [],
           })),
         };
 

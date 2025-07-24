@@ -10,6 +10,7 @@ export interface LobbyPlayer {
   id: string;
   name: string;
   status: "invited" | "joined" | "ready" | "playing";
+  presenceStatus?: "present" | "absent";
   score?: number;
   progress?: number;
 }

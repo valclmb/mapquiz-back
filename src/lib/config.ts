@@ -89,6 +89,12 @@ export const APP_CONSTANTS = {
     DISCONNECTED: "disconnected",
   },
 
+  // Statuts de présence (séparés des statuts de jeu)
+  PRESENCE_STATUS: {
+    PRESENT: "present",
+    ABSENT: "absent",
+  },
+
   // Types de messages WebSocket
   WEBSOCKET_MESSAGES: {
     CONNECTED: "connected",

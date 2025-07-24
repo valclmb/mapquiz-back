@@ -176,10 +176,15 @@ export class LobbyPlayerService {
       // Si c'était l'hôte, vérifier s'il reste d'autres joueurs
       const remainingPlayers = await LobbyModel.getLobbyPlayers(lobbyId);
 
-      if (remainingPlayers.length === 0) {
-        // Si plus de joueurs, supprimer le lobby
+      // Vérifier s'il y a des joueurs présents (pas absents)
+      const presentPlayers = remainingPlayers.filter(
+        (p) => p.presenceStatus === "present"
+      );
+
+      if (presentPlayers.length === 0) {
+        // Si plus de joueurs présents, supprimer le lobby
         console.log(
-          `Hôte ${userId} a quitté et plus de joueurs, suppression du lobby ${lobbyId}`
+          `Hôte ${userId} a quitté et plus de joueurs présents, suppression du lobby ${lobbyId}`
         );
         await LobbyModel.deleteLobby(lobbyId);
         LobbyManager.removeLobby(lobbyId);
@@ -283,6 +288,7 @@ export class LobbyPlayerService {
       id: p.userId,
       name: p.user.name,
       status: p.status as LobbyPlayer["status"],
+      presenceStatus: p.presenceStatus as "present" | "absent",
     }));
   }
 
@@ -293,7 +299,7 @@ export class LobbyPlayerService {
     userId: string,
     lobbyId: string,
     absent: boolean
-  ): Promise<void> {
+  ): Promise<{ changed: boolean }> {
     const validatedLobbyId = validateLobbyId(lobbyId);
     const validatedUserId = validateUserId(userId);
 
@@ -307,42 +313,85 @@ export class LobbyPlayerService {
       validatedLobbyId,
       validatedUserId
     );
+
+    // Si le joueur n'existe pas dans la base de données
     if (!player) {
-      throw new NotFoundError("Joueur dans le lobby");
+      // Vérifier si le joueur est autorisé (dans authorizedPlayers ou est l'hôte)
+      if (
+        !lobby.authorizedPlayers.includes(validatedUserId) &&
+        lobby.hostId !== validatedUserId
+      ) {
+        // Si le joueur n'est pas autorisé, on ignore silencieusement la requête
+        // au lieu de lancer une erreur qui pollue les logs
+        // Log silencieux pour éviter la pollution des logs
+        return { changed: false };
+      }
+
+      // Si le joueur est autorisé mais pas encore dans le lobby, on ne fait rien
+      // car il ne peut pas être marqué comme absent s'il n'est pas encore présent
+      // Log silencieux pour éviter la pollution des logs
+      return { changed: false };
     }
 
-    // Déterminer le nouveau statut
-    let newStatus: string;
-    if (absent) {
-      newStatus = APP_CONSTANTS.PLAYER_STATUS.DISCONNECTED;
+    // Vérifier le statut actuel avant de faire la mise à jour
+    const currentPresenceStatus = player.presenceStatus;
+    const newPresenceStatus = absent
+      ? APP_CONSTANTS.PRESENCE_STATUS.ABSENT
+      : APP_CONSTANTS.PRESENCE_STATUS.PRESENT;
+
+    // Ne faire la mise à jour que si le statut change
+    if (currentPresenceStatus !== newPresenceStatus) {
+      // Gérer la présence physique avec presenceStatus
+      if (absent) {
+        // Marquer comme absent
+        await LobbyModel.updatePlayerPresenceStatus(
+          validatedLobbyId,
+          validatedUserId,
+          APP_CONSTANTS.PRESENCE_STATUS.ABSENT
+        );
+      } else {
+        // Marquer comme présent
+        await LobbyModel.updatePlayerPresenceStatus(
+          validatedLobbyId,
+          validatedUserId,
+          APP_CONSTANTS.PRESENCE_STATUS.PRESENT
+        );
+      }
+
+      console.log(
+        `Joueur ${validatedUserId} marqué comme ${absent ? "absent" : "présent"} dans le lobby ${validatedLobbyId}`
+      );
     } else {
-      // Si le joueur revient, le remettre en statut "joined"
-      newStatus = APP_CONSTANTS.PLAYER_STATUS.JOINED;
+      // Log silencieux pour éviter la pollution des logs
+      return { changed: false };
     }
 
-    // Mettre à jour en base de données
-    await LobbyModel.updatePlayerStatus(
-      validatedLobbyId,
-      validatedUserId,
-      newStatus
-    );
-
-    // Gérer la mémoire selon le statut
+    // Gérer la mémoire selon la présence
     if (absent) {
       // Si le joueur est absent, le retirer de la mémoire (sans supprimer le lobby)
-      LobbyManager.removeDisconnectedPlayerFromLobby(validatedLobbyId, validatedUserId);
-    } else {
-      // Si le joueur revient, le remettre en mémoire avec le statut "joined"
-      LobbyManager.updatePlayerStatus(
+      LobbyManager.removeDisconnectedPlayerFromLobby(
         validatedLobbyId,
-        validatedUserId,
-        newStatus
+        validatedUserId
       );
+    } else {
+      // Si le joueur revient, le remettre en mémoire
+      const lobbyInMemory = LobbyManager.getLobbyInMemory(validatedLobbyId);
+      if (lobbyInMemory && !lobbyInMemory.players.has(validatedUserId)) {
+        // Si le joueur n'est pas en mémoire, l'ajouter
+        const user = await UserModel.findUserById(validatedUserId);
+        if (user) {
+          LobbyManager.addPlayerToLobby(
+            validatedLobbyId,
+            validatedUserId,
+            user.name
+          );
+        }
+      }
+      // Note: On ne change pas le statut de jeu (joined/ready/playing) ici
+      // car on gère seulement la présence physique
     }
 
-    console.log(
-      `Joueur ${validatedUserId} marqué comme ${absent ? "absent" : "présent"} dans le lobby ${validatedLobbyId}`
-    );
+    return { changed: true };
   }
 
   /**
@@ -437,6 +486,22 @@ export class LobbyPlayerService {
       throw new NotFoundError("Joueur dans le lobby");
     }
 
+    // Vérifier si le joueur est physiquement présent
+    if (player.presenceStatus === APP_CONSTANTS.PRESENCE_STATUS.ABSENT) {
+      const lobbyInMemory = LobbyManager.getLobbyInMemory(validatedLobbyId);
+      if (lobbyInMemory && lobbyInMemory.players.has(userId)) {
+        // Le joueur est en mémoire, donc il est actuellement connecté
+        console.log(
+          `Joueur ${userId} était marqué comme absent mais est actuellement connecté, autorisation de jouer`
+        );
+      } else {
+        // Le joueur n'est pas en mémoire, il ne peut pas jouer
+        throw new LobbyError(
+          "Vous êtes déconnecté et ne pouvez pas jouer. Revenez sur la page du lobby pour continuer."
+        );
+      }
+    }
+
     // console.log(
     //   `verifyPlayerInLobby - Joueur ${userId} trouvé avec statut: ${player.status}`
     // );
@@ -461,16 +526,31 @@ export class LobbyPlayerService {
     //     id: p.id,
     //     name: p.name || "Unknown",
     //     status: p.status,
+    //     presenceStatus: p.presenceStatus,
     //   }))
     // );
 
-    // Vérifier que tous les joueurs sont prêts
-    const allReady = players.every(
+    // Filtrer seulement les joueurs présents
+    const presentPlayers = players.filter(
+      (p) => p.presenceStatus === APP_CONSTANTS.PRESENCE_STATUS.PRESENT
+    );
+
+    // Vérifier qu'il y a au moins 1 joueur présent (permettre les parties solo)
+    if (presentPlayers.length < 1) {
+      console.log(
+        `areAllPlayersReady - Pas assez de joueurs présents: ${presentPlayers.length} (minimum 1 requis)`
+      );
+      return false;
+    }
+
+    // Vérifier que tous les joueurs présents sont prêts
+    const allReady = presentPlayers.every(
       (p) => p.status === APP_CONSTANTS.PLAYER_STATUS.READY
     );
-    // console.log(
-    //   `areAllPlayersReady - Tous les joueurs sont prêts: ${allReady}`
-    // );
+
+    console.log(
+      `areAllPlayersReady - Joueurs présents: ${presentPlayers.length}, tous prêts: ${allReady}`
+    );
 
     return allReady;
   }

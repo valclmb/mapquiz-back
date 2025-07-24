@@ -116,6 +116,10 @@ export class WebSocketMessageHandler {
 
         case WS_MESSAGE_TYPES.START_GAME:
           if (!this.requireAuth(userId, socket)) return;
+          console.log("🚀 WebSocketMessageHandler - START_GAME reçu:", {
+            payload,
+            userId,
+          });
           result = await WebSocketController.handleStartGame(payload, userId!);
           break;
 
@@ -204,8 +208,6 @@ export class WebSocketMessageHandler {
     payload: any,
     userId: string
   ): Promise<any> {
-    console.log("handleSetPlayerAbsent - Début avec:", { payload, userId });
-
     const { lobbyId, absent } = payload;
     if (!lobbyId) {
       throw new Error("lobbyId requis");
@@ -217,21 +219,25 @@ export class WebSocketMessageHandler {
       throw new Error("userId requis");
     }
 
-    console.log(
-      "handleSetPlayerAbsent - Validation passée, appel de LobbyService.setPlayerAbsent"
-    );
-
     try {
       const { LobbyService } = await import("../../services/lobbyService.js");
-      await LobbyService.setPlayerAbsent(userId, lobbyId, absent);
+      const result = await LobbyService.setPlayerAbsent(
+        userId,
+        lobbyId,
+        absent
+      );
 
-      // Diffuser la mise à jour à tous les joueurs du lobby
-      const { BroadcastManager } = await import("../lobby/broadcastManager.js");
-      const { getLobbyInMemory } = await import("../lobby/lobbyManager.js");
+      // Diffuser la mise à jour seulement si un changement a été effectué
+      if (result?.changed) {
+        const { BroadcastManager } = await import(
+          "../lobby/broadcastManager.js"
+        );
+        const { getLobbyInMemory } = await import("../lobby/lobbyManager.js");
 
-      const lobby = getLobbyInMemory(lobbyId);
-      if (lobby) {
-        await BroadcastManager.broadcastLobbyUpdate(lobbyId, lobby);
+        const lobby = getLobbyInMemory(lobbyId);
+        if (lobby) {
+          await BroadcastManager.broadcastLobbyUpdate(lobbyId, lobby);
+        }
       }
 
       return {
@@ -364,14 +370,16 @@ export class WebSocketMessageHandler {
       let errorMessage = "Impossible de récupérer l'état du lobby";
 
       if (error instanceof Error) {
-        if (error.message.includes("Non autorisé")) {
-          errorMessage =
-            "Vous n'êtes pas autorisé à accéder à ce lobby. Veuillez rejoindre le lobby d'abord.";
+        if (
+          error.message.includes("pas autorisé") ||
+          error.message.includes("non autorisé")
+        ) {
+          errorMessage = "Vous n'êtes pas autorisé à accéder à ce lobby";
         } else if (error.message.includes("Lobby non trouvé")) {
-          errorMessage = "Ce lobby n'existe pas ou a été supprimé.";
+          errorMessage = "Ce lobby n'existe pas ou a été supprimé";
         } else if (error.message.includes("Utilisateur non trouvé")) {
           errorMessage =
-            "Problème d'authentification. Veuillez vous reconnecter.";
+            "Problème d'authentification. Veuillez vous reconnecter";
         } else {
           errorMessage = `Impossible de récupérer l'état du lobby: ${error.message}`;
         }

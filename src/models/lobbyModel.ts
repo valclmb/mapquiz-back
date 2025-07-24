@@ -86,6 +86,42 @@ export const updatePlayerStatus = async (
   });
 };
 
+export const updatePlayerDisconnectedAt = async (
+  lobbyId: string,
+  userId: string,
+  disconnectedAt: Date | null
+) => {
+  return await prisma.lobbyPlayer.update({
+    where: {
+      lobbyId_userId: {
+        lobbyId,
+        userId,
+      },
+    },
+    data: {
+      disconnectedAt,
+    },
+  });
+};
+
+export const updatePlayerPresenceStatus = async (
+  lobbyId: string,
+  userId: string,
+  presenceStatus: string
+) => {
+  return await prisma.lobbyPlayer.update({
+    where: {
+      lobbyId_userId: {
+        lobbyId,
+        userId,
+      },
+    },
+    data: {
+      presenceStatus,
+    },
+  });
+};
+
 export const removePlayerFromLobby = async (
   lobbyId: string,
   userId: string
@@ -271,22 +307,45 @@ export const updatePlayerGameData = async (
   score: number,
   progress: number,
   validatedCountries: string[],
-  incorrectCountries: string[]
+  incorrectCountries: string[],
+  status?: string
 ) => {
-  return await prisma.lobbyPlayer.update({
+  const updateData: any = {
+    score,
+    progress,
+    validatedCountries,
+    incorrectCountries,
+  };
+
+  // Ajouter le statut s'il est fourni
+  if (status) {
+    updateData.status = status;
+  }
+
+  console.log(`🔍 updatePlayerGameData - Données à sauvegarder:`, {
+    lobbyId,
+    userId,
+    updateData,
+  });
+
+  const result = await prisma.lobbyPlayer.update({
     where: {
       lobbyId_userId: {
         lobbyId,
         userId,
       },
     },
-    data: {
-      score,
-      progress,
-      validatedCountries,
-      incorrectCountries,
-    },
+    data: updateData,
   });
+
+  console.log(`✅ updatePlayerGameData - Résultat sauvegarde:`, {
+    userId: result.userId,
+    status: result.status,
+    score: result.score,
+    progress: result.progress,
+  });
+
+  return result;
 };
 
 export const getLobbyWithGameState = async (lobbyId: string) => {

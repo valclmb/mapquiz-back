@@ -88,13 +88,21 @@ export class PlayerManager {
       progress: Math.min(progress, 100),
     });
 
-    return {
+    const updatedPlayer = {
       ...player,
       validatedCountries,
       incorrectCountries,
       score,
       progress: Math.min(progress, 100), // S'assurer que la progression ne dépasse pas 100%
     };
+
+    console.log(`🔍 PlayerManager.updatePlayerProgress - Statut préservé:`, {
+      playerId: player.name,
+      oldStatus: player.status,
+      newStatus: updatedPlayer.status,
+    });
+
+    return updatedPlayer;
   }
 
   /**

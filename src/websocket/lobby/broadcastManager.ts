@@ -8,7 +8,10 @@ export class BroadcastManager {
   /**
    * Diffuse une mise à jour du lobby à tous les joueurs
    */
-  static async broadcastLobbyUpdate(lobbyId: string, lobbyData: any): Promise<void> {
+  static async broadcastLobbyUpdate(
+    lobbyId: string,
+    lobbyData: any
+  ): Promise<void> {
     console.log("BroadcastManager.broadcastLobbyUpdate - lobbyData:", {
       lobbyId,
       status: lobbyData.status,
@@ -16,57 +19,72 @@ export class BroadcastManager {
       playersCount: lobbyData.players.size,
     });
 
-    // Récupérer les joueurs actifs du lobby en mémoire
-    const activePlayers = Array.from(lobbyData.players.entries()).map(
-      (entry: any) => {
-        const [id, data] = entry;
+    // Récupérer tous les joueurs du lobby depuis la base de données pour avoir les données les plus récentes
+    const { prisma } = await import("../../lib/database.js");
+    const allLobbyPlayers = await prisma.lobbyPlayer.findMany({
+      where: { lobbyId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    });
+
+    console.log("🔍 broadcastLobbyUpdate - Données DB vs Mémoire:", {
+      dbPlayers: allLobbyPlayers.map((p: any) => ({
+        id: p.user.id,
+        status: p.status,
+      })),
+      memoryPlayers: Array.from(lobbyData.players.entries()).map(
+        (entry: any) => ({ id: entry[0], status: entry[1].status })
+      ),
+    });
+
+    // Séparer les joueurs actifs et absents
+    const activePlayers = allLobbyPlayers
+      .filter((player: any) => player.presenceStatus === "present")
+      .map((player: any) => {
+        // Utiliser les données de la mémoire si disponibles, sinon utiliser la DB
+        const memoryPlayer = lobbyData.players.get(player.user.id);
         return {
-          id,
-          name: data.name,
-          status: data.status,
-          score: data.score || 0,
-          progress: data.progress || 0,
-          validatedCountries: data.validatedCountries || [],
-          incorrectCountries: data.incorrectCountries || [],
+          id: player.user.id,
+          name: player.user.name,
+          status: memoryPlayer ? memoryPlayer.status : player.status,
+          score: memoryPlayer ? memoryPlayer.score : player.score || 0,
+          progress: memoryPlayer ? memoryPlayer.progress : player.progress || 0,
+          validatedCountries: memoryPlayer
+            ? memoryPlayer.validatedCountries
+            : player.validatedCountries || [],
+          incorrectCountries: memoryPlayer
+            ? memoryPlayer.incorrectCountries
+            : player.incorrectCountries || [],
           isDisconnected: false,
           disconnectedAt: null,
         };
-      }
-    );
-
-    // Récupérer les joueurs déconnectés depuis la base de données
-    try {
-      const { prisma } = await import("../../lib/database.js");
-      const disconnectedPlayers = await prisma.lobbyPlayer.findMany({
-        where: {
-          lobbyId,
-          status: "disconnected",
-        },
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-            },
-          },
-        },
       });
 
-      const disconnectedPlayersData = disconnectedPlayers.map((player) => ({
+    // Récupérer les joueurs absents depuis les données déjà récupérées
+    const absentPlayersData = allLobbyPlayers
+      .filter((player: any) => player.presenceStatus === "absent")
+      .map((player: any) => ({
         id: player.user.id,
         name: player.user.name,
-        status: "disconnected",
-        score: 0,
-        progress: 0,
-        validatedCountries: [],
-        incorrectCountries: [],
-        isDisconnected: true,
-        disconnectedAt: player.disconnectedAt,
+        status: player.status,
+        score: player.score || 0,
+        progress: player.progress || 0,
+        validatedCountries: player.validatedCountries || [],
+        incorrectCountries: player.incorrectCountries || [],
+        isPresentInLobby: false,
+        leftLobbyAt: player.disconnectedAt,
       }));
 
-      // Combiner les joueurs actifs et déconnectés
-      const allPlayers = [...activePlayers, ...disconnectedPlayersData];
+    // Combiner les joueurs actifs et absents
+    const allPlayers = [...activePlayers, ...absentPlayersData];
 
+    try {
       const message = {
         type: "lobby_update",
         payload: {
@@ -82,15 +100,19 @@ export class BroadcastManager {
         type: message.type,
         payload: message.payload,
         playersCount: allPlayers.length,
-        disconnectedCount: disconnectedPlayersData.length,
+        absentCount: absentPlayersData.length,
       });
 
-      for (const [playerId] of lobbyData.players) {
-        sendToUser(playerId, message);
+      // Diffuser à tous les joueurs du lobby
+      for (const player of allLobbyPlayers) {
+        sendToUser(player.user.id, message);
       }
     } catch (error) {
-      console.error("Erreur lors de la récupération des joueurs déconnectés:", error);
-      
+      console.error(
+        "Erreur lors de la récupération des joueurs déconnectés:",
+        error
+      );
+
       // En cas d'erreur, envoyer seulement les joueurs actifs
       const message = {
         type: "lobby_update",
@@ -153,7 +175,8 @@ export class BroadcastManager {
         return {
           id,
           name: data.name,
-          status: data.status,
+          // Suppression du statut pendant le jeu - pas besoin de l'afficher
+          // status: data.status,
           score: data.score,
           progress: data.progress,
           validatedCountries: data.validatedCountries || [],
@@ -161,6 +184,18 @@ export class BroadcastManager {
         };
       }
     );
+
+    console.log(`🔍 broadcastPlayerProgressUpdate - Données diffusées:`, {
+      lobbyId,
+      players: players.map((p) => ({
+        id: p.id,
+        name: p.name,
+        // Suppression du statut pendant le jeu - pas besoin de l'afficher
+        // status: p.status,
+        score: p.score,
+        progress: p.progress,
+      })),
+    });
 
     const message = {
       type: "player_progress_update",
@@ -212,7 +247,8 @@ export class BroadcastManager {
           name: data.name,
           score: data.score,
           progress: data.progress,
-          status: data.status,
+          // Suppression du statut pendant le jeu - pas besoin de l'afficher
+          // status: data.status,
         };
       }
     );

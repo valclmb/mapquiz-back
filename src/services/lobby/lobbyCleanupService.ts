@@ -1,5 +1,5 @@
-import { prisma } from "../../lib/database.js";
 import { APP_CONSTANTS } from "../../lib/config.js";
+import { prisma } from "../../lib/database.js";
 import * as LobbyManager from "../../websocket/lobby/lobbyManager.js";
 
 /**
@@ -9,7 +9,10 @@ export class LobbyCleanupService {
   /**
    * Marque un joueur comme déconnecté
    */
-  static async markPlayerAsDisconnected(userId: string, lobbyId: string): Promise<void> {
+  static async markPlayerAsDisconnected(
+    userId: string,
+    lobbyId: string
+  ): Promise<void> {
     try {
       await prisma.lobbyPlayer.updateMany({
         where: {
@@ -17,21 +20,29 @@ export class LobbyCleanupService {
           userId: userId,
         },
         data: {
-          status: APP_CONSTANTS.PLAYER_STATUS.DISCONNECTED,
+          presenceStatus: APP_CONSTANTS.PRESENCE_STATUS.ABSENT,
           disconnectedAt: new Date(),
         },
       });
 
-      console.log(`Joueur ${userId} marqué comme déconnecté dans le lobby ${lobbyId}`);
+      // console.log(
+      //   `Joueur ${userId} marqué comme déconnecté dans le lobby ${lobbyId}`
+      // );
     } catch (error) {
-      console.error(`Erreur lors du marquage du joueur ${userId} comme déconnecté:`, error);
+      console.error(
+        `Erreur lors du marquage du joueur ${userId} comme déconnecté:`,
+        error
+      );
     }
   }
 
   /**
    * Restaure un joueur déconnecté
    */
-  static async restoreDisconnectedPlayer(userId: string, lobbyId: string): Promise<void> {
+  static async restoreDisconnectedPlayer(
+    userId: string,
+    lobbyId: string
+  ): Promise<void> {
     try {
       await prisma.lobbyPlayer.updateMany({
         where: {
@@ -39,21 +50,28 @@ export class LobbyCleanupService {
           userId: userId,
         },
         data: {
-          status: APP_CONSTANTS.PLAYER_STATUS.JOINED,
+          presenceStatus: APP_CONSTANTS.PRESENCE_STATUS.PRESENT,
           disconnectedAt: null,
         },
       });
 
       console.log(`Joueur ${userId} restauré dans le lobby ${lobbyId}`);
     } catch (error) {
-      console.error(`Erreur lors de la restauration du joueur ${userId}:`, error);
+      console.error(
+        `Erreur lors de la restauration du joueur ${userId}:`,
+        error
+      );
     }
   }
 
   /**
    * Supprime un joueur déconnecté du lobby (appelé par l'hôte)
    */
-  static async removeDisconnectedPlayer(userId: string, lobbyId: string, hostId: string): Promise<void> {
+  static async removeDisconnectedPlayer(
+    userId: string,
+    lobbyId: string,
+    hostId: string
+  ): Promise<void> {
     try {
       // Vérifier que l'utilisateur est bien l'hôte
       const lobby = await prisma.gameLobby.findUnique({
@@ -78,9 +96,14 @@ export class LobbyCleanupService {
         LobbyManager.removePlayerFromLobby(lobbyId, userId);
       }
 
-      console.log(`Joueur déconnecté ${userId} supprimé du lobby ${lobbyId} par l'hôte ${hostId}`);
+      console.log(
+        `Joueur déconnecté ${userId} supprimé du lobby ${lobbyId} par l'hôte ${hostId}`
+      );
     } catch (error) {
-      console.error(`Erreur lors de la suppression du joueur déconnecté ${userId}:`, error);
+      console.error(
+        `Erreur lors de la suppression du joueur déconnecté ${userId}:`,
+        error
+      );
       throw error;
     }
   }
@@ -97,7 +120,10 @@ export class LobbyCleanupService {
         },
       });
     } catch (error) {
-      console.error(`Erreur lors de la mise à jour de l'activité du lobby ${lobbyId}:`, error);
+      console.error(
+        `Erreur lors de la mise à jour de l'activité du lobby ${lobbyId}:`,
+        error
+      );
     }
   }
 
@@ -106,7 +132,9 @@ export class LobbyCleanupService {
    */
   static async cleanupInactiveLobbies(): Promise<void> {
     try {
-      const cutoffTime = new Date(Date.now() - APP_CONSTANTS.TIMEOUTS.LOBBY_CLEANUP_DELAY);
+      const cutoffTime = new Date(
+        Date.now() - APP_CONSTANTS.TIMEOUTS.LOBBY_CLEANUP_DELAY
+      );
 
       // Trouver les lobbies inactifs
       const inactiveLobbies = await prisma.gameLobby.findMany({
@@ -129,7 +157,8 @@ export class LobbyCleanupService {
         try {
           // Vérifier si tous les joueurs sont déconnectés
           const allDisconnected = lobby.players.every(
-            player => player.status === APP_CONSTANTS.PLAYER_STATUS.DISCONNECTED
+            (player) =>
+              player.status === APP_CONSTANTS.PLAYER_STATUS.DISCONNECTED
           );
 
           if (allDisconnected || lobby.players.length === 0) {
@@ -148,7 +177,10 @@ export class LobbyCleanupService {
             console.log(`Lobby inactif ${lobby.id} supprimé`);
           }
         } catch (error) {
-          console.error(`Erreur lors de la suppression du lobby ${lobby.id}:`, error);
+          console.error(
+            `Erreur lors de la suppression du lobby ${lobby.id}:`,
+            error
+          );
         }
       }
     } catch (error) {
@@ -161,7 +193,9 @@ export class LobbyCleanupService {
    */
   static async cleanupDisconnectedPlayers(): Promise<void> {
     try {
-      const cutoffTime = new Date(Date.now() - APP_CONSTANTS.TIMEOUTS.PLAYER_DISCONNECT_TIMEOUT);
+      const cutoffTime = new Date(
+        Date.now() - APP_CONSTANTS.TIMEOUTS.PLAYER_DISCONNECT_TIMEOUT
+      );
 
       // Trouver les joueurs déconnectés depuis trop longtemps
       const disconnectedPlayers = await prisma.lobbyPlayer.findMany({
@@ -176,7 +210,9 @@ export class LobbyCleanupService {
         },
       });
 
-      console.log(`Nettoyage de ${disconnectedPlayers.length} joueur(s) déconnecté(s)`);
+      console.log(
+        `Nettoyage de ${disconnectedPlayers.length} joueur(s) déconnecté(s)`
+      );
 
       for (const player of disconnectedPlayers) {
         try {
@@ -191,7 +227,9 @@ export class LobbyCleanupService {
             LobbyManager.removePlayerFromLobby(player.lobbyId, player.userId);
           }
 
-          console.log(`Joueur déconnecté ${player.userId} supprimé du lobby ${player.lobbyId}`);
+          console.log(
+            `Joueur déconnecté ${player.userId} supprimé du lobby ${player.lobbyId}`
+          );
 
           // Vérifier si le lobby est maintenant vide
           const remainingPlayers = await prisma.lobbyPlayer.findMany({
@@ -209,7 +247,10 @@ export class LobbyCleanupService {
             console.log(`Lobby vide ${player.lobbyId} supprimé`);
           }
         } catch (error) {
-          console.error(`Erreur lors de la suppression du joueur déconnecté ${player.userId}:`, error);
+          console.error(
+            `Erreur lors de la suppression du joueur déconnecté ${player.userId}:`,
+            error
+          );
         }
       }
     } catch (error) {
@@ -221,16 +262,22 @@ export class LobbyCleanupService {
    * Démarre le service de nettoyage automatique
    */
   static startCleanupService(): void {
-    // Nettoyer les lobbies inactifs toutes les 5 minutes
-    setInterval(() => {
-      this.cleanupInactiveLobbies();
-    }, 5 * 60 * 1000);
+    // Service de nettoyage désactivé pour éviter la suppression des lobbies
+    console.log("Service de nettoyage automatique désactivé");
+    
+    // // Nettoyer les lobbies inactifs toutes les 5 minutes
+    // setInterval(
+    //   () => {
+    //     this.cleanupInactiveLobbies();
+    //   },
+    //   5 * 60 * 1000
+    // );
 
-    // Nettoyer les joueurs déconnectés toutes les minutes
-    setInterval(() => {
-      this.cleanupDisconnectedPlayers();
-    }, 60 * 1000);
+    // // Nettoyer les joueurs déconnectés toutes les minutes
+    // setInterval(() => {
+    //   this.cleanupDisconnectedPlayers();
+    // }, 60 * 1000);
 
-    console.log("Service de nettoyage automatique démarré");
+    // console.log("Service de nettoyage automatique démarré");
   }
-} 
+}
