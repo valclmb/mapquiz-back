@@ -30,7 +30,7 @@ export const createLobby = async (
 };
 
 export const getLobby = async (lobbyId: string) => {
-  return await prisma.gameLobby.findUnique({
+  const lobby = await prisma.gameLobby.findUnique({
     where: { id: lobbyId },
     include: {
       host: true,
@@ -41,6 +41,17 @@ export const getLobby = async (lobbyId: string) => {
       },
     },
   });
+  if (lobby && lobby.players) {
+    console.log(
+      ">>> getLobby - players:",
+      lobby.players.map((p) => ({
+        id: p.userId,
+        validatedCountries: p.validatedCountries,
+        incorrectCountries: p.incorrectCountries,
+      }))
+    );
+  }
+  return lobby;
 };
 
 export const addPlayerToLobby = async (
@@ -310,6 +321,12 @@ export const updatePlayerGameData = async (
   incorrectCountries: string[],
   status?: string
 ) => {
+  console.log(">>> updatePlayerGameData", {
+    lobbyId,
+    userId,
+    validatedCountries,
+    incorrectCountries,
+  });
   const updateData: any = {
     score,
     progress,

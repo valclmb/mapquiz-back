@@ -609,6 +609,24 @@ export async function restartLobby(lobbyId: string) {
       incorrectCountries: [],
       completionTime: null,
     });
+
+    // PATCH: Remettre à zéro en base de données aussi
+    try {
+      const { updatePlayerGameData } = await import(
+        "../../models/lobbyModel.js"
+      );
+      await updatePlayerGameData(
+        lobbyId,
+        playerId,
+        0, // score
+        0, // progress
+        [], // validatedCountries
+        [], // incorrectCountries
+        "joined" // status
+      );
+    } catch (error) {
+      console.error(`Erreur lors du reset du joueur ${playerId} en DB:`, error);
+    }
   }
 
   // Diffuser la mise à jour du lobby

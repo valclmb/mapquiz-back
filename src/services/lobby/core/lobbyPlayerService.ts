@@ -1,11 +1,14 @@
-import { APP_CONSTANTS } from '../../../lib/config.js';
-import { LobbyError, NotFoundError, ValidationError } from '../../../lib/errors.js';
-import { validateLobbyId, validateUserId } from '../../../lib/validation.js';
-import { lobbyRepository } from '../../../repositories/lobbyRepository.js';
-import { loggers } from '../../../config/logger.js';
-import { sendToUser } from '../../../websocket/core/connectionManager.js';
-import { LobbyManager } from '../../../websocket/lobby/lobbyManagerStub.js';
-import { BroadcastManager } from '../../../websocket/lobby/broadcastManager.js';
+import { loggers } from "../../../config/logger.js";
+import { APP_CONSTANTS } from "../../../lib/config.js";
+import {
+  LobbyError,
+  NotFoundError,
+  ValidationError,
+} from "../../../lib/errors.js";
+import { validateLobbyId, validateUserId } from "../../../lib/validation.js";
+import { lobbyRepository } from "../../../repositories/lobbyRepository.js";
+import { sendToUser } from "../../../websocket/core/connectionManager.js";
+import { LobbyManager } from "../../../websocket/lobby/lobbyManagerStub.js";
 
 /**
  * Service dédié à la gestion des joueurs dans les lobbies
@@ -14,7 +17,11 @@ export class LobbyPlayerService {
   /**
    * Invite un ami dans un lobby
    */
-  static async inviteToLobby(hostId: string, lobbyId: string, friendId: string) {
+  static async inviteToLobby(
+    hostId: string,
+    lobbyId: string,
+    friendId: string
+  ) {
     const validatedLobbyId = validateLobbyId(lobbyId);
     const validatedFriendId = validateUserId(friendId);
 
@@ -24,13 +31,19 @@ export class LobbyPlayerService {
     }
 
     // Vérifier si le joueur est déjà dans le lobby
-    const existingPlayer = await lobbyRepository.findPlayer(validatedLobbyId, validatedFriendId);
+    const existingPlayer = await lobbyRepository.findPlayer(
+      validatedLobbyId,
+      validatedFriendId
+    );
     if (existingPlayer) {
       return { success: true, message: "Joueur déjà dans le lobby" };
     }
 
     // Ajouter l'utilisateur à la liste des joueurs autorisés
-    await lobbyRepository.addAuthorizedPlayer(validatedLobbyId, validatedFriendId);
+    await lobbyRepository.addAuthorizedPlayer(
+      validatedLobbyId,
+      validatedFriendId
+    );
 
     // Envoyer une notification à l'ami
     sendToUser(validatedFriendId, {
@@ -43,10 +56,10 @@ export class LobbyPlayerService {
       },
     });
 
-    loggers.player.info('Invitation envoyée', {
+    loggers.player.info("Invitation envoyée", {
       lobbyId: validatedLobbyId,
       friendId: validatedFriendId,
-      hostId
+      hostId,
     });
 
     return { success: true, message: "Invitation envoyée" };
@@ -61,7 +74,7 @@ export class LobbyPlayerService {
 
     const lobby = await lobbyRepository.findById(validatedLobbyId, false);
     if (!lobby) {
-      throw new NotFoundError('Lobby');
+      throw new NotFoundError("Lobby");
     }
 
     // Vérifier l'autorisation
@@ -70,7 +83,10 @@ export class LobbyPlayerService {
     }
 
     // Vérifier si le joueur est déjà dans le lobby
-    const existingPlayer = await lobbyRepository.findPlayer(validatedLobbyId, validatedUserId);
+    const existingPlayer = await lobbyRepository.findPlayer(
+      validatedLobbyId,
+      validatedUserId
+    );
     if (existingPlayer) {
       // Mise à jour du statut si nécessaire
       if (existingPlayer.status !== APP_CONSTANTS.PLAYER_STATUS.JOINED) {
@@ -95,9 +111,9 @@ export class LobbyPlayerService {
     // Diffuser la mise à jour
     // await BroadcastManager.broadcastLobbyUpdate(validatedLobbyId, lobby);
 
-    loggers.player.info('Joueur rejoint le lobby', {
+    loggers.player.info("Joueur rejoint le lobby", {
       userId: validatedUserId,
-      lobbyId: validatedLobbyId
+      lobbyId: validatedLobbyId,
     });
 
     return { success: true, message: "Lobby rejoint avec succès" };
@@ -112,10 +128,13 @@ export class LobbyPlayerService {
 
     const lobby = await lobbyRepository.findById(validatedLobbyId, false);
     if (!lobby) {
-      throw new NotFoundError('Lobby');
+      throw new NotFoundError("Lobby");
     }
 
-    const player = await lobbyRepository.findPlayer(validatedLobbyId, validatedUserId);
+    const player = await lobbyRepository.findPlayer(
+      validatedLobbyId,
+      validatedUserId
+    );
     if (!player) {
       throw new LobbyError(APP_CONSTANTS.ERRORS.PLAYER_NOT_IN_LOBBY);
     }
@@ -124,13 +143,16 @@ export class LobbyPlayerService {
     await lobbyRepository.removePlayer(validatedLobbyId, validatedUserId);
 
     // Supprimer de la mémoire
-    const memoryRemoved = LobbyManager.removePlayerFromLobby(validatedLobbyId, validatedUserId);
+    const memoryRemoved = LobbyManager.removePlayerFromLobby(
+      validatedLobbyId,
+      validatedUserId
+    );
 
-    loggers.player.info('Joueur quitté le lobby', {
+    loggers.player.info("Joueur quitté le lobby", {
       userId: validatedUserId,
       lobbyId: validatedLobbyId,
       wasHost: lobby.hostId === validatedUserId,
-      memoryRemoved
+      memoryRemoved,
     });
 
     // Si c'est l'hôte qui quitte, terminer la partie
@@ -152,31 +174,44 @@ export class LobbyPlayerService {
     const validatedUserId = validateUserId(userId);
     const validatedLobbyId = validateLobbyId(lobbyId);
 
-    if (typeof ready !== 'boolean') {
-      throw new ValidationError('ready doit être un booléen');
+    if (typeof ready !== "boolean") {
+      throw new ValidationError("ready doit être un booléen");
     }
 
-    const player = await lobbyRepository.findPlayer(validatedLobbyId, validatedUserId);
+    const player = await lobbyRepository.findPlayer(
+      validatedLobbyId,
+      validatedUserId
+    );
     if (!player) {
       throw new LobbyError(APP_CONSTANTS.ERRORS.PLAYER_NOT_IN_LOBBY);
     }
 
-    const newStatus = ready ? APP_CONSTANTS.PLAYER_STATUS.READY : APP_CONSTANTS.PLAYER_STATUS.JOINED;
+    const newStatus = ready
+      ? APP_CONSTANTS.PLAYER_STATUS.READY
+      : APP_CONSTANTS.PLAYER_STATUS.JOINED;
 
     // Mise à jour en base de données
-    await lobbyRepository.updatePlayerStatus(validatedLobbyId, validatedUserId, newStatus);
+    await lobbyRepository.updatePlayerStatus(
+      validatedLobbyId,
+      validatedUserId,
+      newStatus
+    );
 
     // Mise à jour en mémoire
-    LobbyManager.updatePlayerStatus(validatedLobbyId, validatedUserId, newStatus);
+    LobbyManager.updatePlayerStatus(
+      validatedLobbyId,
+      validatedUserId,
+      newStatus
+    );
 
     // Diffuser la mise à jour
     // await BroadcastManager.broadcastLobbyUpdate(validatedLobbyId, lobby);
 
-    loggers.player.debug('Statut de préparation mis à jour', {
+    loggers.player.debug("Statut de préparation mis à jour", {
       userId: validatedUserId,
       lobbyId: validatedLobbyId,
       ready,
-      newStatus
+      newStatus,
     });
 
     return { success: true, ready };
@@ -193,23 +228,30 @@ export class LobbyPlayerService {
     const validatedUserId = validateUserId(userId);
     const validatedLobbyId = validateLobbyId(lobbyId);
 
-    if (typeof absent !== 'boolean') {
-      throw new ValidationError('absent doit être un booléen');
+    if (typeof absent !== "boolean") {
+      throw new ValidationError("absent doit être un booléen");
     }
 
-    const player = await lobbyRepository.findPlayer(validatedLobbyId, validatedUserId);
+    const player = await lobbyRepository.findPlayer(
+      validatedLobbyId,
+      validatedUserId
+    );
     if (!player) {
       throw new LobbyError(APP_CONSTANTS.ERRORS.PLAYER_NOT_IN_LOBBY);
     }
 
     // Vérifier si le changement est nécessaire
-    const currentAbsent = player.presenceStatus === 'absent';
+    const currentAbsent = player.status === "absent";
     if (currentAbsent === absent) {
       return { changed: false };
     }
 
     // Mise à jour en base de données
-    await lobbyRepository.updatePlayerAbsence(validatedLobbyId, validatedUserId, absent);
+    await lobbyRepository.updatePlayerAbsence(
+      validatedLobbyId,
+      validatedUserId,
+      absent
+    );
 
     // Mise à jour en mémoire
     LobbyManager.updatePlayerAbsence(validatedLobbyId, validatedUserId, absent);
@@ -217,10 +259,10 @@ export class LobbyPlayerService {
     // Diffuser la mise à jour
     // await BroadcastManager.broadcastLobbyUpdate(validatedLobbyId, lobby);
 
-    loggers.player.debug('Statut d\'absence mis à jour', {
+    loggers.player.debug("Statut d'absence mis à jour", {
       userId: validatedUserId,
       lobbyId: validatedLobbyId,
-      absent
+      absent,
     });
 
     return { changed: true };
@@ -230,10 +272,13 @@ export class LobbyPlayerService {
    * Gère le départ de l'hôte
    */
   private static async _handleHostLeaving(lobbyId: string) {
-    loggers.lobby.info('Hôte quitté, terminaison du lobby', { lobbyId });
+    loggers.lobby.info("Hôte quitté, terminaison du lobby", { lobbyId });
 
     // Marquer le lobby comme terminé
-    await lobbyRepository.updateStatus(lobbyId, APP_CONSTANTS.LOBBY_STATUS.FINISHED);
+    await lobbyRepository.updateStatus(
+      lobbyId,
+      APP_CONSTANTS.LOBBY_STATUS.FINISHED
+    );
 
     // Nettoyer la mémoire
     LobbyManager.removeLobby(lobbyId);

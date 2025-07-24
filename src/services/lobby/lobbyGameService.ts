@@ -342,7 +342,6 @@ export class LobbyGameService {
           id: p.userId,
           name: p.user.name,
           status: p.status,
-          presenceStatus: p.presenceStatus,
         })),
       });
 
@@ -400,8 +399,6 @@ export class LobbyGameService {
           score: p.score,
           progress: p.progress,
           status: p.status,
-          isPresentInLobby: p.presenceStatus === "present",
-          disconnectedAt: p.disconnectedAt,
         }));
 
         console.log(
@@ -436,8 +433,6 @@ export class LobbyGameService {
           score: playerData.score,
           progress: playerData.progress,
           status: playerData.status,
-          isPresentInLobby: true, // Les joueurs en mémoire sont présents dans le lobby
-          leftLobbyAt: null,
         });
       }
 
@@ -454,9 +449,6 @@ export class LobbyGameService {
           score: player.score,
           progress: player.progress,
           status: player.status,
-          isPresentInLobby: player.presenceStatus === "present",
-          leftLobbyAt:
-            player.presenceStatus === "absent" ? player.disconnectedAt : null,
         });
       }
 
@@ -478,8 +470,6 @@ export class LobbyGameService {
             id: p.id,
             name: p.name,
             status: p.status,
-            isPresentInLobby: p.isPresentInLobby,
-            leftLobbyAt: p.leftLobbyAt,
           })),
         }
       );
