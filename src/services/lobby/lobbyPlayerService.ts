@@ -520,36 +520,11 @@ export class LobbyPlayerService {
     // );
 
     const players = await this.getLobbyPlayers(lobbyId);
-    // console.log(
-    //   `areAllPlayersReady - Joueurs récupérés:`,
-    //   players.map((p: any) => ({
-    //     id: p.id,
-    //     name: p.name || "Unknown",
-    //     status: p.status,
-    //     presenceStatus: p.presenceStatus,
-    //   }))
-    // );
 
-    // Filtrer seulement les joueurs présents
-    const presentPlayers = players.filter(
-      (p) => p.presenceStatus === APP_CONSTANTS.PRESENCE_STATUS.PRESENT
-    );
-
-    // Vérifier qu'il y a au moins 1 joueur présent (permettre les parties solo)
-    if (presentPlayers.length < 1) {
-      console.log(
-        `areAllPlayersReady - Pas assez de joueurs présents: ${presentPlayers.length} (minimum 1 requis)`
-      );
-      return false;
-    }
-
-    // Vérifier que tous les joueurs présents sont prêts
-    const allReady = presentPlayers.every(
+    // Nouveau code :
+    if (players.length < 1) return false;
+    const allReady = players.every(
       (p) => p.status === APP_CONSTANTS.PLAYER_STATUS.READY
-    );
-
-    console.log(
-      `areAllPlayersReady - Joueurs présents: ${presentPlayers.length}, tous prêts: ${allReady}`
     );
 
     return allReady;
