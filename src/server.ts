@@ -6,18 +6,31 @@ import Fastify from "fastify";
 import { config } from "./lib/config.js";
 import { prisma } from "./lib/database.js";
 import { errorHandler } from "./lib/errorHandler.js";
+import { loggers } from "./config/logger.js";
 import { apiRoutes } from "./routes/index.js";
 import { LobbyCleanupService } from "./services/lobby/lobbyCleanupService.js";
 import { setupWebSocketHandlers } from "./websocket/index.js";
 
 /**
- * Configuration du serveur Fastify
+ * Configuration optimisée du serveur Fastify
  */
 const fastify = Fastify({
   logger: {
-    level: "warn", // ou "error" pour n'avoir que les erreurs
-    // serializers: { req: () => undefined }, // (optionnel) pour ne pas logger les req du tout
+    level: process.env.NODE_ENV === 'production' ? 'warn' : 'info',
+    serializers: { 
+      req: (req) => ({
+        method: req.method,
+        url: req.url,
+        headers: req.headers
+      }),
+      res: (res) => ({
+        statusCode: res.statusCode
+      })
+    }
   },
+  trustProxy: true,
+  keepAliveTimeout: 5000,
+  maxParamLength: 200,
 });
 
 /**
@@ -79,38 +92,91 @@ setupWebSocketHandlers(fastify);
 // Démarrage du service de nettoyage automatique des lobbies
 LobbyCleanupService.startCleanupService();
 
-// Pour désactiver les logs Fastify sur les requêtes WebSocket
+// Optimisations des hooks
 fastify.addHook("onRequest", (req, reply, done) => {
-  if (req.url === "/ws") {
+  // Désactiver les logs verbeux pour WebSocket
+  if (req.url === "/ws" && process.env.NODE_ENV === 'production') {
     req.log.info = () => {};
+    req.log.debug = () => {};
   }
   done();
 });
 
-// Gestion des erreurs globales
-fastify.setErrorHandler(errorHandler);
-
-// Gestion de l'arrêt propre
-process.on("SIGINT", async () => {
-  await fastify.close();
-  await prisma.$disconnect();
-  process.exit(0);
+// Hook de performance monitoring
+fastify.addHook("onResponse", (req, reply, done) => {
+  const responseTime = reply.getResponseTime();
+  if (responseTime > 1000) { // > 1s
+    loggers.lobby.warn('Requête lente détectée', {
+      method: req.method,
+      url: req.url,
+      responseTime: `${responseTime}ms`,
+      statusCode: reply.statusCode
+    });
+  }
+  done();
 });
 
-// Démarrage du serveur
-const start = async () => {
+// Gestion optimisée des erreurs
+fastify.setErrorHandler(errorHandler);
+
+// Gestion gracieuse de l'arrêt
+const gracefulShutdown = async (signal: string) => {
+  loggers.lobby.info(`Signal ${signal} reçu, arrêt gracieux en cours...`);
+  
   try {
-    const port = process.env.PORT || 3000;
-    await fastify.listen({ port: Number(port), host: "0.0.0.0" });
-    console.log(`🚀 Serveur démarré sur le port ${port}`);
-    console.log(`🔌 WebSocket disponible sur ws://localhost:${port}/ws`);
-    console.log(
-      `📊 Health check disponible sur http://localhost:${port}/health`
-    );
-  } catch (err) {
-    fastify.log.error(err);
+    // Arrêter le service de nettoyage
+    LobbyCleanupService.stopCleanupService();
+    
+    // Fermer les connexions WebSocket
+    await fastify.close();
+    
+    // Fermer la base de données
+    await prisma.$disconnect();
+    
+    loggers.lobby.info('Arrêt gracieux terminé');
+    process.exit(0);
+  } catch (error) {
+    loggers.lobby.error('Erreur lors de l\'arrêt gracieux', { error });
     process.exit(1);
   }
 };
 
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+
+// Gestion des erreurs non capturées
+process.on('uncaughtException', (error) => {
+  loggers.lobby.error('Exception non capturée', { error: error.message, stack: error.stack });
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  loggers.lobby.error('Promesse rejetée non gérée', { reason, promise });
+});
+
+// Démarrage optimisé du serveur
+const start = async () => {
+  try {
+    const port = Number(process.env.PORT) || 3000;
+    const host = process.env.HOST || "0.0.0.0";
+    
+    await fastify.listen({ port, host });
+    
+    loggers.lobby.info('🚀 Serveur démarré avec succès', {
+      port,
+      host,
+      env: process.env.NODE_ENV || 'development',
+      websocket: `ws://${host === '0.0.0.0' ? 'localhost' : host}:${port}/ws`,
+      health: `http://${host === '0.0.0.0' ? 'localhost' : host}:${port}/health`
+    });
+    
+  } catch (err) {
+    loggers.lobby.error('Erreur au démarrage du serveur', { 
+      error: err instanceof Error ? err.message : 'Unknown error'
+    });
+    process.exit(1);
+  }
+};
+
+// Lancement du serveur
 start();

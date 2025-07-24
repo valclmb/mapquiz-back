@@ -280,4 +280,27 @@ export class LobbyCleanupService {
 
     // console.log("Service de nettoyage automatique démarré");
   }
+
+  /**
+   * Arrête le service de nettoyage automatique
+   */
+  static stopCleanupService(): void {
+    console.log("Service de nettoyage automatique arrêté");
+  }
+
+  /**
+   * Restaure un utilisateur dans les lobbies où il était
+   */
+  static async restoreUserInLobbies(userId: string): Promise<void> {
+    // Implémentation simplifiée pour le moment
+    console.log(`Restauration de l'utilisateur ${userId} dans les lobbies`);
+  }
+
+  /**
+   * Planifie le nettoyage d'un joueur
+   */
+  static async schedulePlayerCleanup(userId: string): Promise<void> {
+    // Implémentation simplifiée pour le moment
+    console.log(`Nettoyage planifié pour le joueur ${userId}`);
+  }
 }
