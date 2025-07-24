@@ -103,7 +103,10 @@ export class WebSocketMessageHandler {
 
         case "update_player_status":
           if (!this.requireAuth(userId, socket)) return;
-          result = await WebSocketController.handleUpdatePlayerStatus(payload, userId!);
+          result = await WebSocketController.handleUpdatePlayerStatus(
+            payload,
+            userId!
+          );
           break;
 
         case WS_MESSAGE_TYPES.SET_PLAYER_ABSENT:
@@ -164,6 +167,7 @@ export class WebSocketMessageHandler {
         case WS_MESSAGE_TYPES.RESTART_GAME:
           if (!this.requireAuth(userId, socket)) return;
           result = await this.handleRestartGame(payload, userId!);
+          // On diffuse à nouveau un message 'game_restarted' à tous les joueurs, mais il doit être interprété comme un retour au lobby
           break;
 
         default:
@@ -434,44 +438,34 @@ export class WebSocketMessageHandler {
       const { LobbyService } = await import("../../services/lobbyService.js");
       await LobbyService.restartGame(userId, lobbyId);
 
-      // S'assurer que le lobby est bien restauré en mémoire avec tous les joueurs
+      // Diffuser un message 'game_restarted' à tous les joueurs pour signaler le retour au lobby
       const { getLobby } = await import("../../models/lobbyModel.js");
       const { restoreLobbyFromDatabase } = await import(
         "../lobby/lobbyManager.js"
       );
-
       const updatedLobby = await getLobby(lobbyId);
       if (updatedLobby) {
         restoreLobbyFromDatabase(lobbyId, updatedLobby);
-        console.log(
-          `MessageHandler.handleRestartGame - Lobby restauré avec ${updatedLobby.players?.length || 0} joueurs`
-        );
-      }
-
-      // Diffuser un message de confirmation à tous les joueurs
-      const { BroadcastManager } = await import("../lobby/broadcastManager.js");
-      const { getLobbyInMemory } = await import("../lobby/lobbyManager.js");
-
-      const lobby = getLobbyInMemory(lobbyId);
-      if (lobby) {
-        // Diffuser un message de restart à tous les joueurs
-        const restartMessage = {
-          type: "game_restarted",
-          payload: {
-            lobbyId,
-            message: "Partie redémarrée par l'hôte",
-          },
-        };
-
-        for (const [playerId] of lobby.players) {
-          const { sendToUser } = await import("../core/connectionManager.js");
-          sendToUser(playerId, restartMessage);
+        const { getLobbyInMemory } = await import("../lobby/lobbyManager.js");
+        const lobby = getLobbyInMemory(lobbyId);
+        if (lobby) {
+          const restartMessage = {
+            type: "game_restarted",
+            payload: {
+              lobbyId,
+              message: "Partie remise à zéro, retour au lobby d'attente.",
+            },
+          };
+          for (const [playerId] of lobby.players) {
+            const { sendToUser } = await import("../core/connectionManager.js");
+            sendToUser(playerId, restartMessage);
+          }
         }
       }
 
       return {
         lobbyId,
-        message: "Partie redémarrée avec succès",
+        message: "Partie remise à zéro, retour au lobby d'attente.",
       };
     } catch (error) {
       console.error(
