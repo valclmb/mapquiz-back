@@ -85,9 +85,7 @@ async function testFrontendRefresh() {
       console.log(`  - Statut: ${lobbyAfterDisconnect.status}`);
       console.log(`  - Joueurs: ${lobbyAfterDisconnect.players.length}`);
       for (const player of lobbyAfterDisconnect.players) {
-        console.log(
-          `    - ${player.user?.name || "Inconnu"}: ${player.status}`
-        );
+        console.log(`    - ${player.userId}: ${player.status}`);
       }
     } else {
       console.log("❌ Lobby supprimé après déconnexion WebSocket");
@@ -107,7 +105,7 @@ async function testFrontendRefresh() {
     console.log(`  - Statut: ${finalState.status}`);
     console.log(`  - Joueurs: ${finalState.players.length}`);
     for (const player of finalState.players) {
-      console.log(`    - ${player.name}: ${player.status}`);
+      console.log(`    - ${player.name || player.id}: ${player.status}`);
     }
 
     // 6. Test 3: Vérification que leave_lobby n'a PAS été envoyé

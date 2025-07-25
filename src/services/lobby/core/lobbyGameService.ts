@@ -1,10 +1,14 @@
-import { APP_CONSTANTS } from '../../../lib/config.js';
-import { LobbyError, NotFoundError } from '../../../lib/errors.js';
-import { validateLobbyId, validateUserId, validateGameProgressRequest, validatePlayerProgressRequest } from '../../../lib/validation.js';
-import { lobbyRepository } from '../../../repositories/lobbyRepository.js';
-import { loggers } from '../../../config/logger.js';
-import { LobbyManager } from '../../../websocket/lobby/lobbyManagerStub.js';
-import { BroadcastManager } from '../../../websocket/lobby/broadcastManager.js';
+import { loggers } from "../../../config/logger.js";
+import { APP_CONSTANTS } from "../../../lib/config.js";
+import { LobbyError } from "../../../lib/errors.js";
+import {
+  validateGameProgressRequest,
+  validateLobbyId,
+  validatePlayerProgressRequest,
+  validateUserId,
+} from "../../../lib/validation.js";
+import { lobbyRepository } from "../../../repositories/lobbyRepository.js";
+import { LobbyManager } from "../../../websocket/lobby/lobbyManagerStub.js";
 
 /**
  * Service dédié à la gestion du jeu dans les lobbies
@@ -17,7 +21,7 @@ export class LobbyGameService {
     const validatedUserId = validateUserId(userId);
     const validatedLobbyId = validateLobbyId(lobbyId);
 
-    const lobby = await lobbyRepository.findByIdOrThrow(validatedLobbyId);
+    const lobby = await lobbyRepository.findLobbyByIdOrThrow(validatedLobbyId);
 
     // Vérifier que l'utilisateur est l'hôte
     if (lobby.hostId !== validatedUserId) {
@@ -32,35 +36,42 @@ export class LobbyGameService {
     );
 
     // Mettre à jour le statut du lobby
-    await lobbyRepository.updateStatus(validatedLobbyId, APP_CONSTANTS.LOBBY_STATUS.PLAYING);
+    await lobbyRepository.updateStatus(
+      validatedLobbyId,
+      APP_CONSTANTS.LOBBY_STATUS.PLAYING
+    );
 
     // Démarrer le jeu en mémoire
     LobbyManager.startGame(validatedLobbyId);
 
-    // Diffuser le démarrage  
+    // Diffuser le démarrage
     // await BroadcastManager.broadcastGameStart(validatedLobbyId, { started: true });
 
-    loggers.game.info('Partie démarrée', {
+    loggers.game.info("Partie démarrée", {
       lobbyId: validatedLobbyId,
       hostId: validatedUserId,
-      playersCount: lobby.players.length
+      playersCount: lobby.players.length,
     });
 
     return {
       success: true,
-      message: 'Partie démarrée avec succès',
-      gameState: LobbyManager.getGameState(validatedLobbyId)
+      message: "Partie démarrée avec succès",
+      gameState: LobbyManager.getGameState(validatedLobbyId),
     };
   }
 
   /**
    * Met à jour les paramètres du lobby
    */
-  static async updateLobbySettings(userId: string, lobbyId: string, settings: any) {
+  static async updateLobbySettings(
+    userId: string,
+    lobbyId: string,
+    settings: any
+  ) {
     const validatedUserId = validateUserId(userId);
     const validatedLobbyId = validateLobbyId(lobbyId);
 
-    const lobby = await lobbyRepository.findByIdOrThrow(validatedLobbyId);
+    const lobby = await lobbyRepository.findLobbyByIdOrThrow(validatedLobbyId);
 
     // Vérifier que l'utilisateur est l'hôte
     if (lobby.hostId !== validatedUserId) {
@@ -76,9 +87,9 @@ export class LobbyGameService {
     // Diffuser la mise à jour
     // await BroadcastManager.broadcastLobbyUpdate(validatedLobbyId, lobby);
 
-    loggers.game.debug('Paramètres du lobby mis à jour', {
+    loggers.game.debug("Paramètres du lobby mis à jour", {
       lobbyId: validatedLobbyId,
-      settings
+      settings,
     });
 
     return { success: true, settings };
@@ -102,13 +113,16 @@ export class LobbyGameService {
       score,
       progress: 0, // À calculer
       answerTime,
-      isConsecutiveCorrect
+      isConsecutiveCorrect,
     });
 
-    const lobby = await lobbyRepository.findByIdOrThrow(validatedLobbyId);
-    
+    const lobby = await lobbyRepository.findLobbyByIdOrThrow(validatedLobbyId);
+
     // Vérifier que le joueur est dans le lobby
-    const player = await lobbyRepository.findPlayer(validatedLobbyId, validatedUserId);
+    const player = await lobbyRepository.findPlayer(
+      validatedLobbyId,
+      validatedUserId
+    );
     if (!player) {
       throw new LobbyError(APP_CONSTANTS.ERRORS.PLAYER_NOT_IN_LOBBY);
     }
@@ -120,7 +134,7 @@ export class LobbyGameService {
       {
         score: progressData.score,
         answerTime: progressData.answerTime,
-        isConsecutiveCorrect: progressData.isConsecutiveCorrect
+        isConsecutiveCorrect: progressData.isConsecutiveCorrect,
       }
     );
 
@@ -155,30 +169,37 @@ export class LobbyGameService {
       validatedCountries,
       incorrectCountries,
       score,
-      progress: Math.round((validatedCountries.length / totalQuestions) * 100)
+      progress: Math.round((validatedCountries.length / totalQuestions) * 100),
     });
 
-    const lobby = await lobbyRepository.findByIdOrThrow(validatedLobbyId);
-    
+    const lobby = await lobbyRepository.findLobbyByIdOrThrow(validatedLobbyId);
+
     // Vérifier que le joueur est dans le lobby
-    const player = await lobbyRepository.findPlayer(validatedLobbyId, validatedUserId);
+    const player = await lobbyRepository.findPlayer(
+      validatedLobbyId,
+      validatedUserId
+    );
     if (!player) {
       throw new LobbyError(APP_CONSTANTS.ERRORS.PLAYER_NOT_IN_LOBBY);
     }
 
     // Mettre à jour en base de données
-    await lobbyRepository.updatePlayerProgress(validatedLobbyId, validatedUserId, {
-      validatedCountries: progressData.validatedCountries,
-      incorrectCountries: progressData.incorrectCountries,
-      score: progressData.score
-    });
+    await lobbyRepository.updatePlayerProgress(
+      validatedLobbyId,
+      validatedUserId,
+      {
+        validatedCountries: progressData.validatedCountries,
+        incorrectCountries: progressData.incorrectCountries,
+        score: progressData.score,
+      }
+    );
 
     // Mettre à jour en mémoire
     LobbyManager.updatePlayerProgress(validatedLobbyId, validatedUserId, {
       validatedCountries: progressData.validatedCountries,
       incorrectCountries: progressData.incorrectCountries,
       score: progressData.score,
-      progress: progressData.progress
+      progress: progressData.progress,
     });
 
     // Diffuser la mise à jour
@@ -194,8 +215,8 @@ export class LobbyGameService {
     const validatedUserId = validateUserId(userId);
     const validatedLobbyId = validateLobbyId(lobbyId);
 
-    const lobby = await lobbyRepository.findByIdOrThrow(validatedLobbyId);
-    
+    const lobby = await lobbyRepository.findLobbyByIdOrThrow(validatedLobbyId);
+
     // Vérifier que le joueur est autorisé
     if (!lobby.authorizedPlayers.includes(validatedUserId)) {
       throw new LobbyError(APP_CONSTANTS.ERRORS.UNAUTHORIZED);
@@ -203,11 +224,11 @@ export class LobbyGameService {
 
     // Obtenir l'état depuis la mémoire (plus rapide)
     const memoryState = LobbyManager.getLobbyState(validatedLobbyId);
-    
+
     if (memoryState) {
       return {
         success: true,
-        lobby: memoryState
+        lobby: memoryState,
       };
     }
 
@@ -220,14 +241,13 @@ export class LobbyGameService {
         hostId: lobby.hostId,
         status: lobby.status,
         settings: lobby.gameSettings,
-        players: lobby.players.map(p => ({
+        players: lobby.players.map((p) => ({
           id: p.userId,
           name: p.user.name,
           status: p.status,
           isHost: p.userId === lobby.hostId,
-          isAbsent: p.presenceStatus === 'absent'
-        }))
-      }
+        })),
+      },
     };
   }
 
@@ -238,23 +258,26 @@ export class LobbyGameService {
     const validatedUserId = validateUserId(userId);
     const validatedLobbyId = validateLobbyId(lobbyId);
 
-    const lobby = await lobbyRepository.findByIdOrThrow(validatedLobbyId);
-    
+    const lobby = await lobbyRepository.findLobbyByIdOrThrow(validatedLobbyId);
+
     // Vérifier que le joueur est dans le lobby
-    const player = await lobbyRepository.findPlayer(validatedLobbyId, validatedUserId);
+    const player = await lobbyRepository.findPlayer(
+      validatedLobbyId,
+      validatedUserId
+    );
     if (!player) {
       throw new LobbyError(APP_CONSTANTS.ERRORS.PLAYER_NOT_IN_LOBBY);
     }
 
     const gameState = LobbyManager.getGameState(validatedLobbyId);
-    
+
     if (!gameState) {
-      throw new LobbyError('Aucun état de jeu trouvé');
+      throw new LobbyError("Aucun état de jeu trouvé");
     }
 
     return {
       success: true,
-      gameState
+      gameState,
     };
   }
 
@@ -265,9 +288,12 @@ export class LobbyGameService {
     const validatedUserId = validateUserId(userId);
     const validatedLobbyId = validateLobbyId(lobbyId);
 
-    const lobby = await lobbyRepository.findByIdOrThrow(validatedLobbyId);
-    
-    const player = await lobbyRepository.findPlayer(validatedLobbyId, validatedUserId);
+    const lobby = await lobbyRepository.findLobbyByIdOrThrow(validatedLobbyId);
+
+    const player = await lobbyRepository.findPlayer(
+      validatedLobbyId,
+      validatedUserId
+    );
     if (!player) {
       throw new LobbyError(APP_CONSTANTS.ERRORS.PLAYER_NOT_IN_LOBBY);
     }
@@ -284,14 +310,14 @@ export class LobbyGameService {
 
     // Si c'est l'hôte, terminer la partie
     if (lobby.hostId === validatedUserId) {
-      await this._endGame(validatedLobbyId, 'host_left');
-      return { success: true, message: 'Partie terminée car l\'hôte a quitté' };
+      await this._endGame(validatedLobbyId, "host_left");
+      return { success: true, message: "Partie terminée car l'hôte a quitté" };
     }
 
     // Diffuser la mise à jour
     // await BroadcastManager.broadcastPlayerLeft(validatedLobbyId, validatedUserId);
 
-    return { success: true, message: 'Partie quittée avec succès' };
+    return { success: true, message: "Partie quittée avec succès" };
   }
 
   /**
@@ -301,7 +327,7 @@ export class LobbyGameService {
     const validatedUserId = validateUserId(userId);
     const validatedLobbyId = validateLobbyId(lobbyId);
 
-    const lobby = await lobbyRepository.findByIdOrThrow(validatedLobbyId);
+    const lobby = await lobbyRepository.findLobbyByIdOrThrow(validatedLobbyId);
 
     // Vérifier que l'utilisateur est l'hôte
     if (lobby.hostId !== validatedUserId) {
@@ -309,7 +335,10 @@ export class LobbyGameService {
     }
 
     // Réinitialiser le statut du lobby
-    await lobbyRepository.updateStatus(validatedLobbyId, APP_CONSTANTS.LOBBY_STATUS.WAITING);
+    await lobbyRepository.updateStatus(
+      validatedLobbyId,
+      APP_CONSTANTS.LOBBY_STATUS.WAITING
+    );
 
     // Réinitialiser les statuts des joueurs
     for (const player of lobby.players) {
@@ -326,12 +355,12 @@ export class LobbyGameService {
     // Diffuser le redémarrage
     // await BroadcastManager.broadcastGameRestart(validatedLobbyId);
 
-    loggers.game.info('Partie redémarrée', {
+    loggers.game.info("Partie redémarrée", {
       lobbyId: validatedLobbyId,
-      hostId: validatedUserId
+      hostId: validatedUserId,
     });
 
-    return { success: true, message: 'Partie redémarrée avec succès' };
+    return { success: true, message: "Partie redémarrée avec succès" };
   }
 
   /**
@@ -341,27 +370,30 @@ export class LobbyGameService {
     const validatedUserId = validateUserId(userId);
     const validatedLobbyId = validateLobbyId(lobbyId);
 
-    const lobby = await lobbyRepository.findByIdOrThrow(validatedLobbyId);
-    
+    const lobby = await lobbyRepository.findLobbyByIdOrThrow(validatedLobbyId);
+
     // Vérifier que le joueur est dans le lobby
-    const player = await lobbyRepository.findPlayer(validatedLobbyId, validatedUserId);
+    const player = await lobbyRepository.findPlayer(
+      validatedLobbyId,
+      validatedUserId
+    );
     if (!player) {
       throw new LobbyError(APP_CONSTANTS.ERRORS.PLAYER_NOT_IN_LOBBY);
     }
 
     const results = LobbyManager.getGameResults(validatedLobbyId);
-    
+
     return {
       success: true,
       results: results || {
-        players: lobby.players.map(p => ({
+        players: lobby.players.map((p) => ({
           id: p.userId,
           name: p.user.name,
           score: p.score || 0,
           validatedCountries: p.validatedCountries || [],
-          incorrectCountries: p.incorrectCountries || []
-        }))
-      }
+          incorrectCountries: p.incorrectCountries || [],
+        })),
+      },
     };
   }
 
@@ -369,10 +401,13 @@ export class LobbyGameService {
    * Termine une partie
    */
   private static async _endGame(lobbyId: string, reason: string) {
-    loggers.game.info('Fin de partie', { lobbyId, reason });
+    loggers.game.info("Fin de partie", { lobbyId, reason });
 
-    await lobbyRepository.updateStatus(lobbyId, APP_CONSTANTS.LOBBY_STATUS.FINISHED);
-    
+    await lobbyRepository.updateStatus(
+      lobbyId,
+      APP_CONSTANTS.LOBBY_STATUS.FINISHED
+    );
+
     LobbyManager.endGame(lobbyId);
 
     // await BroadcastManager.broadcastGameEnd(lobbyId, reason);

@@ -16,7 +16,6 @@ export class LobbyCleanupService {
     try {
       // Suppression totale de la gestion presenceStatus/disconnectedAt
       // (ne rien faire ici)
-
       // console.log(
       //   `Joueur ${userId} marqué comme déconnecté dans le lobby ${lobbyId}`
       // );
@@ -185,9 +184,9 @@ export class LobbyCleanupService {
       const disconnectedPlayers = await prisma.lobbyPlayer.findMany({
         where: {
           status: APP_CONSTANTS.PLAYER_STATUS.DISCONNECTED,
-          disconnectedAt: {
-            lt: cutoffTime,
-          },
+          // disconnectedAt: { // This line is commented out as per the edit hint
+          //   lt: cutoffTime,
+          // },
         },
         include: {
           lobby: true,
@@ -248,7 +247,7 @@ export class LobbyCleanupService {
   static startCleanupService(): void {
     // Service de nettoyage désactivé pour éviter la suppression des lobbies
     console.log("Service de nettoyage automatique désactivé");
-    
+
     // // Nettoyer les lobbies inactifs toutes les 5 minutes
     // setInterval(
     //   () => {

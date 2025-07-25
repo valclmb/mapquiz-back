@@ -182,67 +182,58 @@ export class WebSocketConnectionHandler {
 
           // Marquer le joueur comme présent
           const player = await LobbyModel.getPlayerInLobby(lobby.id, userId);
-          if (player && player.presenceStatus === "absent") {
-            await LobbyModel.updatePlayerPresenceStatus(
-              lobby.id,
-              userId,
-              "present"
-            );
-            console.log(
-              `Joueur ${userId} marqué comme présent dans le lobby ${lobby.id}`
-            );
-          }
+          if (player) {
+            // Restaurer l'utilisateur dans le lobby en mémoire avec ses données complètes
+            if (!lobbyInMemory.players.has(userId)) {
+              console.log(
+                `Ajout de l'utilisateur ${userId} au lobby ${lobby.id} en mémoire avec restauration des données`
+              );
 
-          // Restaurer l'utilisateur dans le lobby en mémoire avec ses données complètes
-          if (!lobbyInMemory.players.has(userId)) {
-            console.log(
-              `Ajout de l'utilisateur ${userId} au lobby ${lobby.id} en mémoire avec restauration des données`
-            );
-
-            // Récupérer les données complètes du joueur depuis la base de données
-            const playerData = await LobbyModel.getPlayerInLobby(
-              lobby.id,
-              userId
-            );
-            console.log(`🔍 Restauration - Données récupérées de la DB:`, {
-              userId,
-              status: playerData?.status,
-              score: playerData?.score,
-              progress: playerData?.progress,
-            });
-
-            if (playerData) {
-              // Restaurer le joueur avec ses données complètes
-              lobbyInMemory.players.set(userId, {
-                name: user.name,
-                status: playerData.status || "joined",
-                score: playerData.score || 0,
-                progress: playerData.progress || 0,
-                validatedCountries: playerData.validatedCountries || [],
-                incorrectCountries: playerData.incorrectCountries || [],
+              // Récupérer les données complètes du joueur depuis la base de données
+              const playerData = await LobbyModel.getPlayerInLobby(
+                lobby.id,
+                userId
+              );
+              console.log(`🔍 Restauration - Données récupérées de la DB:`, {
+                userId,
+                status: playerData?.status,
+                score: playerData?.score,
+                progress: playerData?.progress,
               });
 
-              console.log(
-                `✅ Joueur ${userId} restauré avec statut: ${playerData.status}, score: ${playerData.score}, progress: ${playerData.progress}`
-              );
+              if (playerData) {
+                // Restaurer le joueur avec ses données complètes
+                lobbyInMemory.players.set(userId, {
+                  name: user.name,
+                  status: playerData.status || "joined",
+                  score: playerData.score || 0,
+                  progress: playerData.progress || 0,
+                  validatedCountries: playerData.validatedCountries || [],
+                  incorrectCountries: playerData.incorrectCountries || [],
+                });
+
+                console.log(
+                  `✅ Joueur ${userId} restauré avec statut: ${playerData.status}, score: ${playerData.score}, progress: ${playerData.progress}`
+                );
+              } else {
+                // Si pas de données en DB, créer un joueur par défaut sans diffuser
+                console.log(
+                  `Aucune donnée trouvée en DB pour ${userId}, création d'un joueur par défaut`
+                );
+                lobbyInMemory.players.set(userId, {
+                  name: user.name,
+                  status: "joined",
+                  score: 0,
+                  progress: 0,
+                  validatedCountries: [],
+                  incorrectCountries: [],
+                });
+              }
             } else {
-              // Si pas de données en DB, créer un joueur par défaut sans diffuser
               console.log(
-                `Aucune donnée trouvée en DB pour ${userId}, création d'un joueur par défaut`
+                `Utilisateur ${userId} déjà présent dans le lobby ${lobby.id} en mémoire`
               );
-              lobbyInMemory.players.set(userId, {
-                name: user.name,
-                status: "joined",
-                score: 0,
-                progress: 0,
-                validatedCountries: [],
-                incorrectCountries: [],
-              });
             }
-          } else {
-            console.log(
-              `Utilisateur ${userId} déjà présent dans le lobby ${lobby.id} en mémoire`
-            );
           }
 
           // Diffuser la mise à jour du lobby après restauration

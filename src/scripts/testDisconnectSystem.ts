@@ -73,9 +73,7 @@ async function testDisconnectSystem() {
     if (lobbyAfterDisconnect) {
       console.log("✅ Lobby existe toujours");
       lobbyAfterDisconnect.players.forEach((player) => {
-        console.log(
-          `  - ${player.user.name}: ${player.status} (déconnecté le: ${player.disconnectedAt})`
-        );
+        console.log(`  - ${player.user.name}: ${player.status}`);
       });
     } else {
       console.log("❌ Lobby supprimé");
@@ -115,9 +113,7 @@ async function testDisconnectSystem() {
     if (lobbyAfterRestore) {
       console.log("✅ Lobby existe toujours");
       lobbyAfterRestore.players.forEach((player) => {
-        console.log(
-          `  - ${player.user.name}: ${player.status} (déconnecté le: ${player.disconnectedAt || "jamais"})`
-        );
+        console.log(`  - ${player.user.name}: ${player.status}`);
       });
     }
 

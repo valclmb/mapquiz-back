@@ -178,7 +178,7 @@ export class LobbyPlayerService {
 
       // Vérifier s'il y a des joueurs présents (pas absents)
       const presentPlayers = remainingPlayers.filter(
-        (p) => p.presenceStatus === "present"
+        (p) => p.status === "present"
       );
 
       if (presentPlayers.length === 0) {
@@ -288,7 +288,6 @@ export class LobbyPlayerService {
       id: p.userId,
       name: p.user.name,
       status: p.status as LobbyPlayer["status"],
-      presenceStatus: p.presenceStatus as "present" | "absent",
     }));
   }
 
@@ -403,7 +402,7 @@ export class LobbyPlayerService {
     }
 
     // Vérifier si le joueur est physiquement présent
-    if (player.presenceStatus === APP_CONSTANTS.PRESENCE_STATUS.ABSENT) {
+    if (player.status === APP_CONSTANTS.PRESENCE_STATUS.ABSENT) {
       const lobbyInMemory = LobbyManager.getLobbyInMemory(validatedLobbyId);
       if (lobbyInMemory && lobbyInMemory.players.has(userId)) {
         // Le joueur est en mémoire, donc il est actuellement connecté
