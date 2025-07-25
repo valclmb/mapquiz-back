@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import cors from "@fastify/cors";
 import helmet from "@fastify/helmet";
 import rateLimit from "@fastify/rate-limit";
