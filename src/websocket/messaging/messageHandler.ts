@@ -205,6 +205,13 @@ export class WebSocketMessageHandler {
             await BroadcastManager.broadcastLobbyUpdate(lobbyId, lobby);
           }
         }
+        // Ajout du broadcast après la réponse de succès pour restart_game
+        if (type === "restart_game" && lobbyId) {
+          const lobby = LobbyManager.getLobbyInMemory(lobbyId);
+          if (lobby) {
+            await BroadcastManager.broadcastLobbyUpdate(lobbyId, lobby);
+          }
+        }
       }
     } catch (error) {
       console.error("Erreur lors du traitement du message:", error);
@@ -450,21 +457,17 @@ export class WebSocketMessageHandler {
       await LobbyService.restartGame(userId, lobbyId);
 
       // Diffuser un message 'game_restarted' à tous les joueurs pour signaler le retour au lobby
-      const updatedLobby = await LobbyModel.getLobby(lobbyId);
-      if (updatedLobby) {
-        LobbyManager.restoreLobbyFromDatabase(lobbyId, updatedLobby);
-        const lobby = LobbyManager.getLobbyInMemory(lobbyId);
-        if (lobby) {
-          const restartMessage = {
-            type: "game_restarted",
-            payload: {
-              lobbyId,
-              message: "Partie remise à zéro, retour au lobby d'attente.",
-            },
-          };
-          for (const [playerId] of lobby.players) {
-            sendToUser(playerId, restartMessage);
-          }
+      const lobby = LobbyManager.getLobbyInMemory(lobbyId);
+      if (lobby) {
+        const restartMessage = {
+          type: "game_restarted",
+          payload: {
+            lobbyId,
+            message: "Partie remise à zéro, retour au lobby d'attente.",
+          },
+        };
+        for (const [playerId] of lobby.players) {
+          sendToUser(playerId, restartMessage);
         }
       }
 

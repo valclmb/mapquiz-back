@@ -583,11 +583,6 @@ export function getGameState(lobbyId: string, userId: string) {
 
 // Restaurer un lobby depuis la base de données
 export function restoreLobbyFromDatabase(lobbyId: string, lobbyData: any) {
-  if (activeLobbies.has(lobbyId)) {
-    console.log(`Lobby ${lobbyId} déjà actif, pas de restauration nécessaire`);
-    return;
-  }
-
   // Convertir les données de la base en format Map
   const players = new Map();
   if (lobbyData.players && Array.isArray(lobbyData.players)) {
@@ -655,9 +650,6 @@ export async function restartLobby(lobbyId: string) {
       console.error(`Erreur lors du reset du joueur ${playerId} en DB:`, error);
     }
   }
-
-  // Diffuser la mise à jour du lobby
-  await BroadcastManager.broadcastLobbyUpdate(lobbyId, lobby);
 
   console.log(`Lobby ${lobbyId} redémarré avec succès`);
   return true;
