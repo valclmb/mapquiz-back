@@ -1,9 +1,47 @@
+import * as LobbyModel from "../../models/lobbyModel.js";
+import { LobbyPlayerService } from "../../services/lobby/lobbyPlayerService.js";
 import { BroadcastManager } from "./broadcastManager.js";
 import { GameStateManager } from "./gameStateManager.js";
 import { PlayerManager } from "./playerManager.js";
 
 // Map des lobbies actifs : lobbyId -> {players, gameState}
 const activeLobbies = new Map();
+
+// Map pour stocker les timers de suppression différée
+const lobbyDeletionTimers = new Map<string, NodeJS.Timeout>();
+
+function scheduleLobbyDeletion(
+  lobbyId: string,
+  delayMs: number = 3 * 60 * 1000
+) {
+  if (lobbyDeletionTimers.has(lobbyId)) return;
+  const timer = setTimeout(async () => {
+    // Suppression du lobby de la base et de la mémoire
+    try {
+      await LobbyModel.deleteLobby(lobbyId);
+      activeLobbies.delete(lobbyId);
+      console.log(
+        `Lobby ${lobbyId} supprimé après 3 minutes d'inactivité (vide)`
+      );
+    } catch (e) {
+      console.error(
+        `Erreur lors de la suppression différée du lobby ${lobbyId}:`,
+        e
+      );
+    }
+    lobbyDeletionTimers.delete(lobbyId);
+  }, delayMs);
+  lobbyDeletionTimers.set(lobbyId, timer);
+}
+
+function cancelLobbyDeletion(lobbyId: string) {
+  const timer = lobbyDeletionTimers.get(lobbyId);
+  if (timer) {
+    clearTimeout(timer);
+    lobbyDeletionTimers.delete(lobbyId);
+    console.log(`Suppression différée annulée pour le lobby ${lobbyId}`);
+  }
+}
 
 // Créer un nouveau lobby
 export function createLobby(
@@ -32,9 +70,11 @@ export async function addPlayerToLobby(
 ) {
   const lobby = activeLobbies.get(lobbyId);
   if (!lobby) return false;
-
+  // Si le lobby était vide et en attente de suppression, on annule le timer
+  if (lobby.players.size === 0) {
+    cancelLobbyDeletion(lobbyId);
+  }
   lobby.players.set(playerId, PlayerManager.createPlayer(playerName));
-  await BroadcastManager.broadcastLobbyUpdate(lobbyId, lobby);
   return true;
 }
 
@@ -65,8 +105,7 @@ export async function updatePlayerStatus(
 
   // Sauvegarder le statut en base de données
   try {
-    const { updatePlayerStatus } = await import("../../models/lobbyModel.js");
-    await updatePlayerStatus(lobbyId, playerId, status);
+    await LobbyModel.updatePlayerStatus(lobbyId, playerId, status);
     console.log(`Statut sauvegardé en DB pour ${playerId}: ${status}`);
   } catch (error) {
     console.error(
@@ -88,10 +127,7 @@ export async function updatePlayerStatus(
           `Vérification si tous les joueurs sont prêts pour le lobby ${lobbyId} (${lobby.players.size} joueur${lobby.players.size > 1 ? "s" : ""})`
         );
 
-        // Importer le service pour vérifier en base de données
-        const { LobbyPlayerService } = await import(
-          "../../services/lobby/lobbyPlayerService.js"
-        );
+        // Vérifier en base de données
         const allReady = await LobbyPlayerService.areAllPlayersReady(
           lobbyId,
           lobby.hostId
@@ -134,8 +170,7 @@ export async function startGame(lobbyId: string) {
 
   // Mettre à jour le statut du lobby en base de données
   try {
-    const { updateLobbyStatus } = await import("../../models/lobbyModel.js");
-    await updateLobbyStatus(lobbyId, "playing");
+    await LobbyModel.updateLobbyStatus(lobbyId, "playing");
     console.log(`Statut du lobby ${lobbyId} mis à jour en base de données`);
   } catch (error) {
     console.error(
@@ -189,8 +224,7 @@ export async function startGame(lobbyId: string) {
       );
 
       // Mettre à jour en base de données
-      const { updatePlayerStatus } = await import("../../models/lobbyModel.js");
-      await updatePlayerStatus(lobbyId, playerId, "playing");
+      await LobbyModel.updatePlayerStatus(lobbyId, playerId, "playing");
 
       console.log(`✅ startGame - Joueur ${playerId} mis à jour vers playing`);
     }
@@ -211,8 +245,7 @@ export async function startGame(lobbyId: string) {
 
   // Sauvegarder l'état du jeu en base de données
   try {
-    const { saveGameState } = await import("../../models/lobbyModel.js");
-    await saveGameState(lobbyId, lobby.gameState);
+    await LobbyModel.saveGameState(lobbyId, lobby.gameState);
     console.log(
       `État du jeu sauvegardé en base de données pour le lobby ${lobbyId}`
     );
@@ -261,8 +294,7 @@ export async function updatePlayerScore(
 
   // Sauvegarder en base de données
   try {
-    const { updatePlayerGameData } = await import("../../models/lobbyModel.js");
-    await updatePlayerGameData(
+    await LobbyModel.updatePlayerGameData(
       lobbyId,
       playerId,
       updatedPlayer.score,
@@ -322,7 +354,6 @@ export async function updatePlayerProgress(
 
   // Sauvegarder en base de données
   try {
-    const { updatePlayerGameData } = await import("../../models/lobbyModel.js");
     console.log(`🔍 updatePlayerProgress - Avant sauvegarde DB:`, {
       playerId,
       status: updatedPlayer.status,
@@ -330,7 +361,7 @@ export async function updatePlayerProgress(
       progress: updatedPlayer.progress,
     });
 
-    await updatePlayerGameData(
+    await LobbyModel.updatePlayerGameData(
       lobbyId,
       playerId,
       updatedPlayer.score,
@@ -421,8 +452,7 @@ async function endGame(lobbyId: string) {
 
   // Mettre à jour le statut du lobby en base de données
   try {
-    const { updateLobbyStatus } = await import("../../models/lobbyModel.js");
-    await updateLobbyStatus(lobbyId, "finished");
+    await LobbyModel.updateLobbyStatus(lobbyId, "finished");
     console.log(
       `Statut du lobby ${lobbyId} mis à jour en base de données vers 'finished'`
     );
@@ -454,7 +484,7 @@ export async function removePlayerFromLobby(lobbyId: string, playerId: string) {
 
   // Si plus de joueurs, supprimer le lobby
   if (lobby.players.size === 0) {
-    removeLobby(lobbyId);
+    scheduleLobbyDeletion(lobbyId);
   } else {
     // Si l'hôte part, transférer l'hôte au premier joueur restant
     if (playerId === lobby.hostId) {
@@ -553,11 +583,6 @@ export function getGameState(lobbyId: string, userId: string) {
 
 // Restaurer un lobby depuis la base de données
 export function restoreLobbyFromDatabase(lobbyId: string, lobbyData: any) {
-  if (activeLobbies.has(lobbyId)) {
-    console.log(`Lobby ${lobbyId} déjà actif, pas de restauration nécessaire`);
-    return;
-  }
-
   // Convertir les données de la base en format Map
   const players = new Map();
   if (lobbyData.players && Array.isArray(lobbyData.players)) {
@@ -612,10 +637,7 @@ export async function restartLobby(lobbyId: string) {
 
     // PATCH: Remettre à zéro en base de données aussi
     try {
-      const { updatePlayerGameData } = await import(
-        "../../models/lobbyModel.js"
-      );
-      await updatePlayerGameData(
+      await LobbyModel.updatePlayerGameData(
         lobbyId,
         playerId,
         0, // score
@@ -629,9 +651,8 @@ export async function restartLobby(lobbyId: string) {
     }
   }
 
-  // Diffuser la mise à jour du lobby
-  await BroadcastManager.broadcastLobbyUpdate(lobbyId, lobby);
-
   console.log(`Lobby ${lobbyId} redémarré avec succès`);
   return true;
 }
+
+export { cancelLobbyDeletion, scheduleLobbyDeletion };

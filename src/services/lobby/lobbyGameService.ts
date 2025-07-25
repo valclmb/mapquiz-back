@@ -247,20 +247,12 @@ export class LobbyGameService {
     // Mettre à jour les paramètres du lobby dans la base de données
     await LobbyModel.updateLobbySettings(lobbyId, settings);
 
-    // --- PATCH: Mettre à jour le lobby en mémoire et diffuser la mise à jour ---
-    const { getLobbyInMemory } = await import(
-      "../../websocket/lobby/lobbyManager.js"
-    );
-    const { BroadcastManager } = await import(
-      "../../websocket/lobby/broadcastManager.js"
-    );
-    console.log("BACKEND - Diffusion lobby_update avec settings :", settings);
-    const lobbyInMemory = getLobbyInMemory(lobbyId);
+    // Mettre à jour le lobby en mémoire
+
+    const lobbyInMemory = LobbyManager.getLobbyInMemory(lobbyId);
     if (lobbyInMemory) {
       lobbyInMemory.settings = settings;
-      await BroadcastManager.broadcastLobbyUpdate(lobbyId, lobbyInMemory); // Diffuse la mise à jour à tous les joueurs
     }
-    // --- FIN PATCH ---
 
     return { success: true, message: "Paramètres mis à jour" };
   }
@@ -756,24 +748,12 @@ export class LobbyGameService {
       // Réinitialiser l'état du jeu en mémoire
       LobbyManager.restartLobby(lobbyId);
 
-      // Restaurer les joueurs depuis la base de données vers la mémoire
-      const updatedLobby = await LobbyModel.getLobby(lobbyId);
-      if (updatedLobby) {
-        LobbyManager.restoreLobbyFromDatabase(lobbyId, updatedLobby);
+      // Vérifier que le lobby est bien redémarré en mémoire
+      const lobbyInMemory = LobbyManager.getLobbyInMemory(lobbyId);
+      if (lobbyInMemory) {
         console.log(
-          `LobbyGameService.restartGame - Joueurs restaurés depuis la base de données: ${updatedLobby.players?.length || 0} joueurs`
+          `LobbyGameService.restartGame - Lobby en mémoire après redémarrage: ${lobbyInMemory.players.size} joueurs`
         );
-
-        // Vérifier que tous les joueurs sont bien en mémoire
-        const { getLobbyInMemory } = await import(
-          "../../websocket/lobby/lobbyManager.js"
-        );
-        const lobbyInMemory = getLobbyInMemory(lobbyId);
-        if (lobbyInMemory) {
-          console.log(
-            `LobbyGameService.restartGame - Lobby en mémoire après restauration: ${lobbyInMemory.players.size} joueurs`
-          );
-        }
       }
 
       console.log(

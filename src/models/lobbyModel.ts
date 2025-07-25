@@ -97,41 +97,41 @@ export const updatePlayerStatus = async (
   });
 };
 
-export const updatePlayerDisconnectedAt = async (
-  lobbyId: string,
-  userId: string,
-  disconnectedAt: Date | null
-) => {
-  return await prisma.lobbyPlayer.update({
-    where: {
-      lobbyId_userId: {
-        lobbyId,
-        userId,
-      },
-    },
-    data: {
-      disconnectedAt,
-    },
-  });
-};
+// export const updatePlayerDisconnectedAt = async (
+//   lobbyId: string,
+//   userId: string,
+//   disconnectedAt: Date | null
+// ) => {
+//   return await prisma.lobbyPlayer.update({
+//     where: {
+//       lobbyId_userId: {
+//         lobbyId,
+//         userId,
+//       },
+//     },
+//     data: {
+//       disconnectedAt,
+//     },
+//   });
+// };
 
-export const updatePlayerPresenceStatus = async (
-  lobbyId: string,
-  userId: string,
-  presenceStatus: string
-) => {
-  return await prisma.lobbyPlayer.update({
-    where: {
-      lobbyId_userId: {
-        lobbyId,
-        userId,
-      },
-    },
-    data: {
-      presenceStatus,
-    },
-  });
-};
+// export const updatePlayerPresenceStatus = async (
+//   lobbyId: string,
+//   userId: string,
+//   presenceStatus: string
+// ) => {
+//   return await prisma.lobbyPlayer.update({
+//     where: {
+//       lobbyId_userId: {
+//         lobbyId,
+//         userId,
+//       },
+//     },
+//     data: {
+//       presenceStatus,
+//     },
+//   });
+// };
 
 export const removePlayerFromLobby = async (
   lobbyId: string,

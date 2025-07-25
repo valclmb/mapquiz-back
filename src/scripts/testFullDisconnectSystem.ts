@@ -130,9 +130,7 @@ async function testFullDisconnectSystem() {
       console.log("  - Aucun joueur déconnecté");
     } else {
       for (const player of disconnectedPlayers) {
-        console.log(
-          `  - ${player.user.name} (déconnecté le: ${player.disconnectedAt})`
-        );
+        console.log(`  - ${player.user.name}: déconnecté`);
       }
     }
 

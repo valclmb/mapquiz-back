@@ -71,7 +71,6 @@ async function testCleanupSystem() {
         lobbyId: lobbyId1,
         userId: testUser1.id,
         status: "disconnected",
-        disconnectedAt: new Date(Date.now() - 2 * 60 * 1000), // Déconnecté depuis 2 minutes
       },
     });
 
@@ -95,9 +94,7 @@ async function testCleanupSystem() {
     });
 
     for (const player of playersBefore) {
-      console.log(
-        `  - ${player.user.name}: ${player.status} (déconnecté le: ${player.disconnectedAt})`
-      );
+      console.log(`  - ${player.user.name}: ${player.status}`);
     }
 
     // Exécuter le nettoyage des joueurs déconnectés

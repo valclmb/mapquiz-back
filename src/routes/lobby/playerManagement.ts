@@ -1,4 +1,5 @@
 import { FastifyInstance } from "fastify";
+import { prisma } from "../../lib/database.js";
 import { requireAuth } from "../../middleware/auth.js";
 import { LobbyCleanupService } from "../../services/lobby/lobbyCleanupService.js";
 
@@ -61,7 +62,6 @@ export async function playerManagementRoutes(fastify: FastifyInstance) {
 
       try {
         // Vérifier que l'utilisateur est dans le lobby
-        const { prisma } = await import("../../lib/database.js");
         const player = await prisma.lobbyPlayer.findUnique({
           where: {
             lobbyId_userId: {

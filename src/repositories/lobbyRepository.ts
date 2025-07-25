@@ -1,8 +1,12 @@
-import type { GameLobby, LobbyPlayer, User } from '../../generated/prisma/index.js';
-import { prisma } from '../lib/database.js';
-import { BaseRepository, queryCache } from '../core/database/repository.js';
-import { LobbySettings } from '../types/index.js';
-import { APP_CONSTANTS } from '../lib/config.js';
+import type {
+  GameLobby,
+  LobbyPlayer,
+  User,
+} from "../../generated/prisma/index.js";
+import { BaseRepository, queryCache } from "../core/database/repository.js";
+import { APP_CONSTANTS } from "../lib/config.js";
+import { prisma } from "../lib/database.js";
+import { LobbySettings } from "../types/index.js";
 
 /**
  * Types pour les inclusions Prisma
@@ -43,21 +47,22 @@ export class LobbyRepository extends BaseRepository<GameLobby> {
     settings: LobbySettings = {}
   ): Promise<LobbyWithDetails> {
     return this.executeQuery(
-      () => this.prisma.gameLobby.create({
-        data: {
-          name: name || `Lobby de ${hostId}`,
-          hostId,
-          gameSettings: settings,
-          authorizedPlayers: [hostId],
-          players: {
-            create: {
-              userId: hostId,
-              status: APP_CONSTANTS.PLAYER_STATUS.JOINED,
+      () =>
+        this.prisma.gameLobby.create({
+          data: {
+            name: name || `Lobby de ${hostId}`,
+            hostId,
+            gameSettings: settings,
+            authorizedPlayers: [hostId],
+            players: {
+              create: {
+                userId: hostId,
+                status: APP_CONSTANTS.PLAYER_STATUS.JOINED,
+              },
             },
           },
-        },
-        include: this.defaultInclude,
-      }),
+          include: this.defaultInclude,
+        }),
       `create lobby for host ${hostId}`
     );
   }
@@ -65,19 +70,23 @@ export class LobbyRepository extends BaseRepository<GameLobby> {
   /**
    * Trouve un lobby par ID avec cache
    */
-  async findById(lobbyId: string, useCache = true): Promise<LobbyWithDetails | null> {
+  async findById(
+    lobbyId: string,
+    useCache = true
+  ): Promise<LobbyWithDetails | null> {
     const cacheKey = `lobby:${lobbyId}`;
-    
+
     if (useCache) {
       const cached = queryCache.get<LobbyWithDetails>(cacheKey);
       if (cached) return cached;
     }
 
     const lobby = await this.executeQuery(
-      () => this.prisma.gameLobby.findUnique({
-        where: { id: lobbyId },
-        include: this.defaultInclude,
-      }),
+      () =>
+        this.prisma.gameLobby.findUnique({
+          where: { id: lobbyId },
+          include: this.defaultInclude,
+        }),
       `find lobby ${lobbyId}`
     );
 
@@ -91,7 +100,7 @@ export class LobbyRepository extends BaseRepository<GameLobby> {
   /**
    * Trouve un lobby par ID ou lance une erreur
    */
-  async findByIdOrThrow(lobbyId: string): Promise<LobbyWithDetails> {
+  async findLobbyByIdOrThrow(lobbyId: string): Promise<LobbyWithDetails> {
     const lobby = await this.findById(lobbyId, false);
     if (!lobby) {
       throw new Error(`Lobby non trouvé: ${lobbyId}`);
@@ -102,12 +111,16 @@ export class LobbyRepository extends BaseRepository<GameLobby> {
   /**
    * Met à jour les paramètres d'un lobby
    */
-  async updateSettings(lobbyId: string, settings: LobbySettings): Promise<void> {
+  async updateSettings(
+    lobbyId: string,
+    settings: LobbySettings
+  ): Promise<void> {
     await this.executeQuery(
-      () => this.prisma.gameLobby.update({
-        where: { id: lobbyId },
-        data: { gameSettings: settings },
-      }),
+      () =>
+        this.prisma.gameLobby.update({
+          where: { id: lobbyId },
+          data: { gameSettings: settings },
+        }),
       `update lobby settings ${lobbyId}`
     );
 
@@ -120,10 +133,11 @@ export class LobbyRepository extends BaseRepository<GameLobby> {
    */
   async updateStatus(lobbyId: string, status: string): Promise<void> {
     await this.executeQuery(
-      () => this.prisma.gameLobby.update({
-        where: { id: lobbyId },
-        data: { status },
-      }),
+      () =>
+        this.prisma.gameLobby.update({
+          where: { id: lobbyId },
+          data: { status },
+        }),
       `update lobby status ${lobbyId} to ${status}`
     );
 
@@ -135,9 +149,10 @@ export class LobbyRepository extends BaseRepository<GameLobby> {
    */
   async delete(lobbyId: string): Promise<void> {
     await this.executeQuery(
-      () => this.prisma.gameLobby.delete({
-        where: { id: lobbyId },
-      }),
+      () =>
+        this.prisma.gameLobby.delete({
+          where: { id: lobbyId },
+        }),
       `delete lobby ${lobbyId}`
     );
 
@@ -154,10 +169,11 @@ export class LobbyRepository extends BaseRepository<GameLobby> {
     const newAuthorizedPlayers = [...lobby.authorizedPlayers, userId];
 
     await this.executeQuery(
-      () => this.prisma.gameLobby.update({
-        where: { id: lobbyId },
-        data: { authorizedPlayers: newAuthorizedPlayers },
-      }),
+      () =>
+        this.prisma.gameLobby.update({
+          where: { id: lobbyId },
+          data: { authorizedPlayers: newAuthorizedPlayers },
+        }),
       `add authorized player ${userId} to lobby ${lobbyId}`
     );
 
@@ -171,16 +187,17 @@ export class LobbyRepository extends BaseRepository<GameLobby> {
     const cutoffDate = new Date(Date.now() - olderThanMs);
 
     return this.executeQuery(
-      () => this.prisma.gameLobby.findMany({
-        where: {
-          updatedAt: {
-            lt: cutoffDate,
+      () =>
+        this.prisma.gameLobby.findMany({
+          where: {
+            updatedAt: {
+              lt: cutoffDate,
+            },
+            status: {
+              not: APP_CONSTANTS.LOBBY_STATUS.FINISHED,
+            },
           },
-          status: {
-            not: APP_CONSTANTS.LOBBY_STATUS.FINISHED,
-          },
-        },
-      }),
+        }),
       `find inactive lobbies older than ${olderThanMs}ms`
     );
   }
@@ -190,14 +207,15 @@ export class LobbyRepository extends BaseRepository<GameLobby> {
    */
   async findEmptyLobbies(): Promise<GameLobby[]> {
     return this.executeQuery(
-      () => this.prisma.gameLobby.findMany({
-        where: {
-          players: {
-            none: {},
+      () =>
+        this.prisma.gameLobby.findMany({
+          where: {
+            players: {
+              none: {},
+            },
           },
-        },
-      }),
-      'find empty lobbies'
+        }),
+      "find empty lobbies"
     );
   }
 
@@ -210,16 +228,17 @@ export class LobbyRepository extends BaseRepository<GameLobby> {
     status: string = APP_CONSTANTS.PLAYER_STATUS.JOINED
   ): Promise<LobbyPlayerWithUser> {
     const result = await this.executeQuery(
-      () => this.prisma.lobbyPlayer.create({
-        data: {
-          lobbyId,
-          userId,
-          status,
-        },
-        include: {
-          user: true,
-        },
-      }),
+      () =>
+        this.prisma.lobbyPlayer.create({
+          data: {
+            lobbyId,
+            userId,
+            status,
+          },
+          include: {
+            user: true,
+          },
+        }),
       `add player ${userId} to lobby ${lobbyId}`
     );
 
@@ -227,16 +246,20 @@ export class LobbyRepository extends BaseRepository<GameLobby> {
     return result as LobbyPlayerWithUser;
   }
 
-  async findPlayer(lobbyId: string, userId: string): Promise<LobbyPlayerWithUser | null> {
+  async findPlayer(
+    lobbyId: string,
+    userId: string
+  ): Promise<LobbyPlayerWithUser | null> {
     return this.executeQuery(
-      () => this.prisma.lobbyPlayer.findUnique({
-        where: {
-          lobbyId_userId: { lobbyId, userId },
-        },
-        include: {
-          user: true,
-        },
-      }),
+      () =>
+        this.prisma.lobbyPlayer.findUnique({
+          where: {
+            lobbyId_userId: { lobbyId, userId },
+          },
+          include: {
+            user: true,
+          },
+        }),
       `find player ${userId} in lobby ${lobbyId}`
     );
   }
@@ -247,12 +270,13 @@ export class LobbyRepository extends BaseRepository<GameLobby> {
     status: string
   ): Promise<void> {
     await this.executeQuery(
-      () => this.prisma.lobbyPlayer.update({
-        where: {
-          lobbyId_userId: { lobbyId, userId },
-        },
-        data: { status },
-      }),
+      () =>
+        this.prisma.lobbyPlayer.update({
+          where: {
+            lobbyId_userId: { lobbyId, userId },
+          },
+          data: { status },
+        }),
       `update player ${userId} status to ${status} in lobby ${lobbyId}`
     );
 
@@ -265,12 +289,13 @@ export class LobbyRepository extends BaseRepository<GameLobby> {
     absent: boolean
   ): Promise<void> {
     await this.executeQuery(
-      () => this.prisma.lobbyPlayer.update({
-        where: {
-          lobbyId_userId: { lobbyId, userId },
-        },
-        data: { isAbsent: absent },
-      }),
+      () =>
+        this.prisma.lobbyPlayer.update({
+          where: {
+            lobbyId_userId: { lobbyId, userId },
+          },
+          data: { isAbsent: absent },
+        }),
       `update player ${userId} absence to ${absent} in lobby ${lobbyId}`
     );
 
@@ -279,11 +304,12 @@ export class LobbyRepository extends BaseRepository<GameLobby> {
 
   async removePlayer(lobbyId: string, userId: string): Promise<void> {
     await this.executeQuery(
-      () => this.prisma.lobbyPlayer.delete({
-        where: {
-          lobbyId_userId: { lobbyId, userId },
-        },
-      }),
+      () =>
+        this.prisma.lobbyPlayer.delete({
+          where: {
+            lobbyId_userId: { lobbyId, userId },
+          },
+        }),
       `remove player ${userId} from lobby ${lobbyId}`
     );
 
@@ -301,12 +327,13 @@ export class LobbyRepository extends BaseRepository<GameLobby> {
     }
   ): Promise<void> {
     await this.executeQuery(
-      () => this.prisma.lobbyPlayer.update({
-        where: {
-          lobbyId_userId: { lobbyId, userId },
-        },
-        data: progressData,
-      }),
+      () =>
+        this.prisma.lobbyPlayer.update({
+          where: {
+            lobbyId_userId: { lobbyId, userId },
+          },
+          data: progressData,
+        }),
       `update player ${userId} progress in lobby ${lobbyId}`
     );
 
@@ -318,12 +345,13 @@ export class LobbyRepository extends BaseRepository<GameLobby> {
    */
   async removeDisconnectedPlayers(lobbyId: string): Promise<number> {
     const result = await this.executeQuery(
-      () => this.prisma.lobbyPlayer.deleteMany({
-        where: {
-          lobbyId,
-          status: APP_CONSTANTS.PLAYER_STATUS.DISCONNECTED,
-        },
-      }),
+      () =>
+        this.prisma.lobbyPlayer.deleteMany({
+          where: {
+            lobbyId,
+            status: APP_CONSTANTS.PLAYER_STATUS.DISCONNECTED,
+          },
+        }),
       `remove disconnected players from lobby ${lobbyId}`
     );
 

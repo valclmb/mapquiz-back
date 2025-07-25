@@ -92,17 +92,17 @@ async function simulateFrontendAPI() {
       host.id
     );
 
-    if (disconnectedPlayersResponse.success) {
+    if (
+      disconnectedPlayersResponse.success &&
+      disconnectedPlayersResponse.disconnectedPlayers
+    ) {
       console.log("✅ API joueurs déconnectés - Réponse:");
       console.log(`  - Success: ${disconnectedPlayersResponse.success}`);
       console.log(
         `  - Nombre de joueurs déconnectés: ${disconnectedPlayersResponse.disconnectedPlayers.length}`
       );
-
       for (const player of disconnectedPlayersResponse.disconnectedPlayers) {
-        console.log(
-          `    - ${player.name} (déconnecté le: ${new Date(player.disconnectedAt).toLocaleString()})`
-        );
+        console.log(`    - ${player.name}`);
       }
     } else {
       console.log(
@@ -152,7 +152,6 @@ async function simulateFrontendAPI() {
         lobbyId: lobbyId,
         userId: player.id,
         status: "disconnected",
-        disconnectedAt: new Date(),
       },
     });
 
@@ -177,7 +176,10 @@ async function simulateFrontendAPI() {
       host.id
     );
 
-    if (finalDisconnectedResponse.success) {
+    if (
+      finalDisconnectedResponse.success &&
+      finalDisconnectedResponse.disconnectedPlayers
+    ) {
       console.log("✅ API joueurs déconnectés après reconnexion:");
       console.log(
         `  - Nombre de joueurs déconnectés: ${finalDisconnectedResponse.disconnectedPlayers.length}`
@@ -264,7 +266,6 @@ async function simulateGetDisconnectedPlayers(lobbyId: string, userId: string) {
       disconnectedPlayers: disconnectedPlayers.map((player) => ({
         id: player.user.id,
         name: player.user.name,
-        disconnectedAt: player.disconnectedAt,
       })),
     };
   } catch (error) {
