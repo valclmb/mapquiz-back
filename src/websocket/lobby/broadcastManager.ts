@@ -1,5 +1,6 @@
 import { sendToUser } from "../core/connectionManager.js";
 import { getLobbyInMemory } from "./lobbyManager.js";
+import { prisma } from "../../lib/database.js";
 
 /**
  * Gestionnaire de diffusion des messages WebSocket
@@ -20,7 +21,6 @@ export class BroadcastManager {
     });
 
     // Récupérer tous les joueurs du lobby depuis la base de données pour avoir les données les plus récentes
-    const { prisma } = await import("../../lib/database.js");
     const allLobbyPlayers = await prisma.lobbyPlayer.findMany({
       where: { lobbyId },
       include: {

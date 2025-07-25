@@ -1,8 +1,10 @@
 import { WebSocket } from "@fastify/websocket";
 import { APP_CONSTANTS } from "../../lib/config.js";
 import * as LobbyModel from "../../models/lobbyModel.js";
+import * as UserModel from "../../models/userModel.js";
 import * as FriendService from "../../services/friendService.js";
 import { LobbyCleanupService } from "../../services/lobby/lobbyCleanupService.js";
+import { BroadcastManager } from "../lobby/broadcastManager.js";
 import * as LobbyManager from "../lobby/lobbyManager.js";
 import { sendSuccessResponse } from "./authentication.js";
 import { addConnection, removeConnection } from "./connectionManager.js";
@@ -164,8 +166,7 @@ export class WebSocketConnectionHandler {
           );
 
           // Récupérer les informations de l'utilisateur
-          const { findUserById } = await import("../../models/userModel.js");
-          const user = await findUserById(userId);
+          const user = await UserModel.findUserById(userId);
 
           if (!user) {
             console.log(
@@ -237,9 +238,6 @@ export class WebSocketConnectionHandler {
           }
 
           // Diffuser la mise à jour du lobby après restauration
-          const { BroadcastManager } = await import(
-            "../lobby/broadcastManager.js"
-          );
           await BroadcastManager.broadcastLobbyUpdate(lobby.id, lobbyInMemory);
         } catch (error) {
           console.error(

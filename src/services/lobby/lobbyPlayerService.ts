@@ -5,6 +5,7 @@ import * as LobbyModel from "../../models/lobbyModel.js";
 import * as UserModel from "../../models/userModel.js";
 import { LobbyPlayer } from "../../types/index.js";
 import { sendToUser } from "../../websocket/core/connectionManager.js";
+import { BroadcastManager } from "../../websocket/lobby/broadcastManager.js";
 import * as LobbyManager from "../../websocket/lobby/lobbyManager.js";
 
 /**
@@ -105,11 +106,27 @@ export class LobbyPlayerService {
 
     // Ajouter ou mettre à jour le joueur dans le lobby en mémoire
     const lobbyInMemory = LobbyManager.getLobbyInMemory(lobbyId);
+    console.log(
+      `joinLobby - Lobby en mémoire pour ${lobbyId}:`,
+      lobbyInMemory ? "trouvé" : "non trouvé"
+    );
+
     if (!lobbyInMemory || !lobbyInMemory.players.has(userId)) {
+      console.log(
+        `joinLobby - Tentative d'ajout du joueur ${userId} au lobby ${lobbyId} en mémoire`
+      );
       // Si le joueur n'est pas dans le Map, l'ajouter
-      LobbyManager.addPlayerToLobby(lobbyId, userId, user.name);
+      const addResult = LobbyManager.addPlayerToLobby(
+        lobbyId,
+        userId,
+        user.name
+      );
+      console.log(`joinLobby - Résultat addPlayerToLobby:`, addResult);
       // console.log(`Joueur ${userId} ajouté au lobby en mémoire`);
     } else {
+      console.log(
+        `joinLobby - Joueur ${userId} déjà présent, mise à jour du statut`
+      );
       // Si le joueur est déjà dans le Map, mettre à jour son statut
       LobbyManager.updatePlayerStatus(
         lobbyId,
@@ -165,9 +182,6 @@ export class LobbyPlayerService {
     LobbyManager.removePlayerFromLobby(lobbyId, userId);
 
     // Diffuser que le joueur a quitté le lobby
-    const { BroadcastManager } = await import(
-      "../../websocket/lobby/broadcastManager.js"
-    );
     BroadcastManager.broadcastPlayerLeftGame(lobbyId, userId, playerName);
 
     // Vérifier si c'était l'hôte et s'il reste d'autres joueurs
@@ -176,21 +190,20 @@ export class LobbyPlayerService {
       // Si c'était l'hôte, vérifier s'il reste d'autres joueurs
       const remainingPlayers = await LobbyModel.getLobbyPlayers(lobbyId);
 
-      // Vérifier s'il y a des joueurs présents (pas absents)
-      const presentPlayers = remainingPlayers.filter(
-        (p) => p.status === "present"
+      // Filtrer les joueurs qui ne sont pas déconnectés
+      const activePlayers = remainingPlayers.filter(
+        (p) => p.status !== APP_CONSTANTS.PLAYER_STATUS.DISCONNECTED
       );
 
-      if (presentPlayers.length === 0) {
-        // Si plus de joueurs présents, supprimer le lobby
+      if (activePlayers.length === 0) {
+        // Si plus de joueurs actifs, le lobby sera supprimé automatiquement par removePlayerFromLobby
         console.log(
-          `Hôte ${userId} a quitté et plus de joueurs présents, suppression du lobby ${lobbyId}`
+          `Hôte ${userId} a quitté et plus de joueurs actifs, suppression du lobby ${lobbyId}`
         );
-        await LobbyModel.deleteLobby(lobbyId);
-        LobbyManager.removeLobby(lobbyId);
+        LobbyManager.removePlayerFromLobby(lobbyId, userId);
       } else {
-        // S'il reste des joueurs, transférer l'hôte au premier joueur restant
-        const newHost = remainingPlayers[0];
+        // S'il reste des joueurs actifs, transférer l'hôte au premier joueur restant
+        const newHost = activePlayers[0];
         console.log(
           `Hôte ${userId} a quitté, transfert de l'hôte à ${newHost.user.name} (${newHost.userId})`
         );

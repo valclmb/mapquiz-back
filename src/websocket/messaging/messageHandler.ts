@@ -1,6 +1,8 @@
 import { WebSocket } from "@fastify/websocket";
 import * as WebSocketController from "../../controllers/websocketController.js";
 import { APP_CONSTANTS } from "../../lib/config.js";
+import * as LobbyModel from "../../models/lobbyModel.js";
+import { LobbyService } from "../../services/lobbyService.js";
 import {
   WebSocketMessage,
   WebSocketResponse,
@@ -10,6 +12,9 @@ import {
   sendErrorResponse,
   sendSuccessResponse,
 } from "../core/authentication.js";
+import { sendToUser } from "../core/connectionManager.js";
+import { BroadcastManager } from "../lobby/broadcastManager.js";
+import * as LobbyManager from "../lobby/lobbyManager.js";
 
 /**
  * Gestionnaire de messages WebSocket
@@ -179,6 +184,27 @@ export class WebSocketMessageHandler {
       if (result) {
         const lobbyId = payload?.lobbyId;
         sendSuccessResponse(socket, result, `${type}_success`, lobbyId);
+        // Ajout du broadcast après la réponse de succès pour update_player_status
+        if (type === "update_player_status" && lobbyId) {
+          const lobby = LobbyManager.getLobbyInMemory(lobbyId);
+          if (lobby) {
+            await BroadcastManager.broadcastLobbyUpdate(lobbyId, lobby);
+          }
+        }
+        // Ajout du broadcast après la réponse de succès pour join_lobby
+        if (type === "join_lobby" && lobbyId) {
+          const lobby = LobbyManager.getLobbyInMemory(lobbyId);
+          if (lobby) {
+            await BroadcastManager.broadcastLobbyUpdate(lobbyId, lobby);
+          }
+        }
+        // Ajout du broadcast après la réponse de succès pour update_lobby_settings
+        if (type === "update_lobby_settings" && lobbyId) {
+          const lobby = LobbyManager.getLobbyInMemory(lobbyId);
+          if (lobby) {
+            await BroadcastManager.broadcastLobbyUpdate(lobbyId, lobby);
+          }
+        }
       }
     } catch (error) {
       console.error("Erreur lors du traitement du message:", error);
@@ -221,7 +247,6 @@ export class WebSocketMessageHandler {
     }
 
     try {
-      const { LobbyService } = await import("../../services/lobbyService.js");
       const result = await LobbyService.setPlayerAbsent(
         userId,
         lobbyId,
@@ -230,12 +255,7 @@ export class WebSocketMessageHandler {
 
       // Diffuser la mise à jour seulement si un changement a été effectué
       if (result?.changed) {
-        const { BroadcastManager } = await import(
-          "../lobby/broadcastManager.js"
-        );
-        const { getLobbyInMemory } = await import("../lobby/lobbyManager.js");
-
-        const lobby = getLobbyInMemory(lobbyId);
+        const lobby = LobbyManager.getLobbyInMemory(lobbyId);
         if (lobby) {
           await BroadcastManager.broadcastLobbyUpdate(lobbyId, lobby);
         }
@@ -277,19 +297,13 @@ export class WebSocketMessageHandler {
 
     try {
       // Utiliser directement le service de lobby pour récupérer l'état du jeu
-      const { LobbyService } = await import("../../services/lobbyService.js");
       const gameState = await LobbyService.getGameState(lobbyId, userId);
 
       // Déclencher aussi une mise à jour du lobby pour que le frontend puisse traiter l'état
       // (même si gameState est null, on veut quand même l'état du lobby)
       try {
-        const { BroadcastManager } = await import(
-          "../lobby/broadcastManager.js"
-        );
-        const { getLobbyInMemory } = await import("../lobby/lobbyManager.js");
-
         // Récupérer le lobby en mémoire pour le broadcast
-        const lobby = getLobbyInMemory(lobbyId);
+        const lobby = LobbyManager.getLobbyInMemory(lobbyId);
         if (lobby) {
           console.log(
             `Broadcast de la mise à jour du lobby ${lobbyId} après get_game_state`
@@ -350,7 +364,6 @@ export class WebSocketMessageHandler {
     );
 
     try {
-      const { LobbyService } = await import("../../services/lobbyService.js");
       const lobbyState = await LobbyService.getLobbyState(lobbyId, userId);
 
       console.log(
@@ -403,7 +416,6 @@ export class WebSocketMessageHandler {
     }
 
     try {
-      const { LobbyService } = await import("../../services/lobbyService.js");
       const results = await LobbyService.getGameResults(lobbyId, userId);
 
       return {
@@ -435,19 +447,13 @@ export class WebSocketMessageHandler {
     }
 
     try {
-      const { LobbyService } = await import("../../services/lobbyService.js");
       await LobbyService.restartGame(userId, lobbyId);
 
       // Diffuser un message 'game_restarted' à tous les joueurs pour signaler le retour au lobby
-      const { getLobby } = await import("../../models/lobbyModel.js");
-      const { restoreLobbyFromDatabase } = await import(
-        "../lobby/lobbyManager.js"
-      );
-      const updatedLobby = await getLobby(lobbyId);
+      const updatedLobby = await LobbyModel.getLobby(lobbyId);
       if (updatedLobby) {
-        restoreLobbyFromDatabase(lobbyId, updatedLobby);
-        const { getLobbyInMemory } = await import("../lobby/lobbyManager.js");
-        const lobby = getLobbyInMemory(lobbyId);
+        LobbyManager.restoreLobbyFromDatabase(lobbyId, updatedLobby);
+        const lobby = LobbyManager.getLobbyInMemory(lobbyId);
         if (lobby) {
           const restartMessage = {
             type: "game_restarted",
@@ -457,7 +463,6 @@ export class WebSocketMessageHandler {
             },
           };
           for (const [playerId] of lobby.players) {
-            const { sendToUser } = await import("../core/connectionManager.js");
             sendToUser(playerId, restartMessage);
           }
         }
@@ -495,10 +500,7 @@ export class WebSocketMessageHandler {
 
     try {
       // Vérifier que l'utilisateur est l'hôte du lobby
-      const { getLobby, removePlayerFromLobby } = await import(
-        "../../models/lobbyModel.js"
-      );
-      const lobby = await getLobby(lobbyId);
+      const lobby = await LobbyModel.getLobby(lobbyId);
 
       if (!lobby) {
         throw new Error("Lobby non trouvé");
@@ -513,31 +515,25 @@ export class WebSocketMessageHandler {
       }
 
       // Supprimer le joueur du lobby en base de données
-      await removePlayerFromLobby(lobbyId, playerId);
+      await LobbyModel.removePlayerFromLobby(lobbyId, playerId);
 
       // Supprimer le joueur du lobby en mémoire
-      const { removePlayerFromLobby: removePlayerFromMemory } = await import(
-        "../lobby/lobbyManager.js"
-      );
-      await removePlayerFromMemory(lobbyId, playerId);
+      await LobbyManager.removePlayerFromLobby(lobbyId, playerId);
 
       // Retirer le joueur de la liste des joueurs autorisés
-      const { updateLobbyAuthorizedPlayers } = await import(
-        "../../models/lobbyModel.js"
+      await LobbyModel.updateLobbyAuthorizedPlayers(
+        lobbyId,
+        playerId,
+        "remove"
       );
-      await updateLobbyAuthorizedPlayers(lobbyId, playerId, "remove");
 
       // Diffuser la mise à jour du lobby
-      const { BroadcastManager } = await import("../lobby/broadcastManager.js");
-      const { getLobbyInMemory } = await import("../lobby/lobbyManager.js");
-
-      const lobbyInMemory = getLobbyInMemory(lobbyId);
+      const lobbyInMemory = LobbyManager.getLobbyInMemory(lobbyId);
       if (lobbyInMemory) {
         await BroadcastManager.broadcastLobbyUpdate(lobbyId, lobbyInMemory);
       }
 
       // Envoyer un message de confirmation à l'hôte
-      const { sendToUser } = await import("../core/connectionManager.js");
       sendToUser(userId, {
         type: "remove_player_success",
         payload: {
