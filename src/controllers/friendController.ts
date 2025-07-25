@@ -1,66 +1,43 @@
 import { FastifyReply, FastifyRequest } from "fastify";
-import { handleError } from "../lib/errorHandler.js";
-import * as FriendService from "../services/friendService.js";
+import { asyncHandler } from "../lib/errorHandler.js";
+import { FriendService } from "../services/friendService.js";
+import {
+  AddFriendRequest,
+  FriendRequestActionRequest,
+  RemoveFriendRequest,
+} from "../types/api.js";
 
-interface AddFriendRequest {
-  Body: { tag: string };
-}
-
-interface RemoveFriendRequest {
-  Body: { friendId: string };
-}
-
-interface FriendRequestActionRequest {
-  Body: { action: "accept" | "reject" };
-  Params: { id: string };
-}
-
-export const addFriend = async (
-  request: FastifyRequest<AddFriendRequest>,
-  reply: FastifyReply
-) => {
-  try {
+export const addFriend = asyncHandler(
+  async (request: FastifyRequest<AddFriendRequest>, reply: FastifyReply) => {
     const userId = (request as any).user.id;
     const { tag } = request.body;
 
     const result = await FriendService.sendFriendRequest(userId, tag);
     return reply.send(result);
-  } catch (error) {
-    return handleError(error, reply, request.log);
   }
-};
+);
 
-export const listFriends = async (
-  request: FastifyRequest,
-  reply: FastifyReply
-) => {
-  try {
+export const listFriends = asyncHandler(
+  async (request: FastifyRequest, reply: FastifyReply) => {
     const userId = (request as any).user.id;
     const result = await FriendService.getFriendsList(userId);
     return reply.send(result);
-  } catch (error) {
-    return handleError(error, reply, request.log);
   }
-};
+);
 
-export const getFriendRequests = async (
-  request: FastifyRequest,
-  reply: FastifyReply
-) => {
-  try {
+export const getFriendRequests = asyncHandler(
+  async (request: FastifyRequest, reply: FastifyReply) => {
     const userId = (request as any).user.id;
-    const result = await FriendService.getFriendRequests(userId);
-    return reply.send(result);
-  } catch (error) {
-    return handleError(error, reply, request.log);
+    const requests = await FriendService.getFriendRequests(userId);
+    return reply.send({ friendRequests: requests });
   }
-};
+);
 
-export const respondToFriendRequest = async (
-  request: FastifyRequest<FriendRequestActionRequest>,
-  reply: FastifyReply
-) => {
-  try {
+export const respondToFriendRequest = asyncHandler(
+  async (
+    request: FastifyRequest<FriendRequestActionRequest>,
+    reply: FastifyReply
+  ) => {
     const userId = (request as any).user.id;
     const { id } = request.params;
     const { action } = request.body;
@@ -71,22 +48,15 @@ export const respondToFriendRequest = async (
       userId
     );
     return reply.send(result);
-  } catch (error) {
-    return handleError(error, reply, request.log);
   }
-};
+);
 
-export const removeFriend = async (
-  request: FastifyRequest<RemoveFriendRequest>,
-  reply: FastifyReply
-) => {
-  try {
+export const removeFriend = asyncHandler(
+  async (request: FastifyRequest<RemoveFriendRequest>, reply: FastifyReply) => {
     const userId = (request as any).user.id;
     const { friendId } = request.body;
 
     const result = await FriendService.removeFriend(userId, friendId);
     return reply.send(result);
-  } catch (error) {
-    return handleError(error, reply, request.log);
   }
-};
+);

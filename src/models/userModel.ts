@@ -74,3 +74,15 @@ export const updateUserStatus = async (
     },
   });
 };
+
+export const findAllUsers = async () => {
+  return prisma.user.findMany({
+    select: {
+      id: true,
+      name: true,
+      tag: true,
+      isOnline: true,
+      lastSeen: true,
+    },
+  });
+};

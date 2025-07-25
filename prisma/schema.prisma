@@ -20,8 +20,8 @@ model User {
   sessions      Session[]
   accounts      Account[]
   tag           String?   @unique
-  isOnline      Boolean   @default(false)  // Nouveau champ pour le statut en ligne
-  lastSeen      DateTime  @default(now())  // Nouveau champ pour la dernière connexion
+  isOnline      Boolean   @default(false)
+  lastSeen      DateTime  @default(now())
   
   // Relations pour les amis
   sentFriendRequests     FriendRequest[] @relation("Sender")
@@ -39,7 +39,6 @@ model User {
   @@map("user")
 }
 
-// Modèle pour les demandes d'amis
 model FriendRequest {
   id         String   @id @default(uuid())
   senderId   String
@@ -54,7 +53,6 @@ model FriendRequest {
   @@map("friend_request")
 }
 
-// Modèle pour les amis (relation bidirectionnelle)
 model Friend {
   id        String   @id @default(uuid())
   userId    String
@@ -102,7 +100,7 @@ model Account {
 }
 
 model Verification {
-  id         String    @id
+  id         String   @id
   identifier String
   value      String
   expiresAt  DateTime
@@ -137,7 +135,6 @@ model GameLobby {
   authorizedPlayers String[] @default([]) // Tableau d'IDs d'utilisateurs autorisés
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
-  lastActivityAt DateTime @default(now()) // Timestamp de dernière activité pour la suppression différée
   players       LobbyPlayer[]
   gameResults   MultiplayerGameResult[]
 
@@ -156,7 +153,6 @@ model LobbyPlayer {
   validatedCountries String[] @default([])
   incorrectCountries String[] @default([])
   joinedAt  DateTime @default(now())
-  // presenceStatus et disconnectedAt supprimés
 
   @@unique([lobbyId, userId])
   @@map("lobby_player")

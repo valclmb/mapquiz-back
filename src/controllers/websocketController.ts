@@ -1,5 +1,5 @@
-import * as FriendService from "../services/friendService.js";
-import { LobbyService } from "../services/lobbyService.js";
+import { FriendService } from "../services/friendService.js";
+import { UserService } from "../services/userService.js";
 import { updatePlayerStatus as updatePlayerStatusInLobby } from "../websocket/lobby/lobbyManager.js";
 
 export const handleSendFriendRequest = async (payload: any, userId: string) => {
@@ -25,84 +25,27 @@ export const handleRespondFriendRequest = async (
   return await FriendService.respondToFriendRequest(requestId, action, userId);
 };
 
-export const handleCreateLobby = async (payload: any, userId: string) => {
-  const { name, settings } = payload;
-  return await LobbyService.createLobby(userId, name, settings);
-};
 
-export const handleInviteToLobby = async (payload: any, userId: string) => {
-  const { lobbyId, friendId } = payload;
-  return await LobbyService.inviteToLobby(userId, lobbyId, friendId);
-};
 
-export const handleJoinLobby = async (payload: any, userId: string) => {
-  const { lobbyId } = payload;
-  return await LobbyService.joinLobby(userId, lobbyId);
-};
+export const handleUpdatePlayerStatus = async (payload: any, userId: string) => {
+  const { lobbyId, status } = payload;
 
-export const handleLeaveLobby = async (payload: any, userId: string) => {
-  const { lobbyId } = payload;
-  return await LobbyService.leaveLobby(userId, lobbyId);
-};
+  if (!lobbyId || !status) {
+    throw new Error("lobbyId et status requis");
+  }
 
-export const handleUpdateLobbySettings = async (
-  payload: any,
-  userId: string
-) => {
-  const { lobbyId, settings } = payload;
-  return await LobbyService.updateLobbySettings(userId, lobbyId, settings);
+  return await updatePlayerStatusInLobby(lobbyId, userId, status);
 };
 
 export const handleStartGame = async (payload: any, userId: string) => {
   const { lobbyId } = payload;
-  return await LobbyService.startGame(userId, lobbyId);
+
+  if (!lobbyId) {
+    throw new Error("lobbyId requis");
+  }
+
+  // Cette fonctionnalité sera gérée par le LobbyManager
+  return { success: true, message: "Démarrage de la partie" };
 };
 
-export const handleUpdateGameProgress = async (
-  payload: any,
-  userId: string
-) => {
-  const { lobbyId, score, answerTime, isConsecutiveCorrect } = payload;
-  return await LobbyService.updateGameProgress(
-    userId,
-    lobbyId,
-    score,
-    answerTime,
-    isConsecutiveCorrect
-  );
-};
 
-export const handleUpdatePlayerProgress = async (
-  payload: any,
-  userId: string
-) => {
-  const {
-    lobbyId,
-    validatedCountries,
-    incorrectCountries,
-    score,
-    totalQuestions,
-  } = payload;
-  return await LobbyService.updatePlayerProgress(
-    userId,
-    lobbyId,
-    validatedCountries,
-    incorrectCountries,
-    score,
-    totalQuestions
-  );
-};
-
-export const handleLeaveGame = async (payload: any, userId: string) => {
-  const { lobbyId } = payload;
-  return await LobbyService.leaveGame(userId, lobbyId);
-};
-
-export const handleUpdatePlayerStatus = async (
-  payload: any,
-  userId: string
-) => {
-  const { lobbyId, status } = payload;
-  if (!lobbyId || !status) throw new Error("lobbyId et status requis");
-  return await updatePlayerStatusInLobby(lobbyId, userId, status);
-};

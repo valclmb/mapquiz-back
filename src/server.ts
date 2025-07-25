@@ -1,15 +1,12 @@
-import 'dotenv/config';
 import cors from "@fastify/cors";
 import helmet from "@fastify/helmet";
 import rateLimit from "@fastify/rate-limit";
 import websocket from "@fastify/websocket";
+import "dotenv/config";
 import Fastify from "fastify";
-import { loggers } from "./config/logger.js";
-import { config } from "./lib/config.js";
 import { prisma } from "./lib/database.js";
 import { errorHandler } from "./lib/errorHandler.js";
 import { apiRoutes } from "./routes/index.js";
-import { LobbyCleanupService } from "./services/lobby/lobbyCleanupService.js";
 import { setupWebSocketHandlers } from "./websocket/index.js";
 
 /**
@@ -42,10 +39,16 @@ async function setupPlugins() {
   await fastify.register(helmet);
 
   // Configuration CORS
-  await fastify.register(cors, config.cors);
+  await fastify.register(cors, {
+    origin: true,
+    credentials: true,
+  });
 
   // Limitation de débit
-  await fastify.register(rateLimit, config.rateLimit);
+  await fastify.register(rateLimit, {
+    max: 100,
+    timeWindow: "1 minute",
+  });
 
   // Plugin WebSocket
   await fastify.register(websocket);
@@ -99,8 +102,8 @@ await fastify.register(apiRoutes, { prefix: "/api" });
 // Configuration des WebSockets
 setupWebSocketHandlers(fastify);
 
-// Démarrage du service de nettoyage automatique des lobbies
-LobbyCleanupService.startCleanupService();
+// Gestionnaire d'erreur global
+fastify.setErrorHandler(errorHandler);
 
 // Optimisations des hooks
 fastify.addHook("onRequest", (req, reply, done) => {
@@ -117,27 +120,21 @@ fastify.addHook("onResponse", (req, reply, done) => {
   done();
 });
 
-// Gestion optimisée des erreurs
-fastify.setErrorHandler(errorHandler);
-
 // Gestion gracieuse de l'arrêt
 const gracefulShutdown = async (signal: string) => {
-  loggers.lobby.info(`Signal ${signal} reçu, arrêt gracieux en cours...`);
+  console.log(`Signal ${signal} reçu, arrêt gracieux en cours...`);
 
   try {
-    // Arrêter le service de nettoyage
-    LobbyCleanupService.stopCleanupService();
-
     // Fermer les connexions WebSocket
     await fastify.close();
 
     // Fermer la base de données
     await prisma.$disconnect();
 
-    loggers.lobby.info("Arrêt gracieux terminé");
+    console.log("Arrêt gracieux terminé");
     process.exit(0);
   } catch (error) {
-    loggers.lobby.error("Erreur lors de l'arrêt gracieux", { error });
+    console.error("Erreur lors de l'arrêt gracieux", { error });
     process.exit(1);
   }
 };
@@ -147,7 +144,7 @@ process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
 
 // Gestion des erreurs non capturées
 process.on("uncaughtException", (error) => {
-  loggers.lobby.error("Exception non capturée", {
+  console.error("Exception non capturée", {
     error: error.message,
     stack: error.stack,
   });
@@ -155,7 +152,7 @@ process.on("uncaughtException", (error) => {
 });
 
 process.on("unhandledRejection", (reason, promise) => {
-  loggers.lobby.error("Promesse rejetée non gérée", { reason, promise });
+  console.error("Promesse rejetée non gérée", { reason, promise });
 });
 
 // Démarrage optimisé du serveur
@@ -166,15 +163,17 @@ const start = async () => {
 
     await fastify.listen({ port, host });
 
-    loggers.lobby.info("🚀 Serveur démarré avec succès", {
+    console.log("🚀 Serveur démarré avec succès", {
       port,
       host,
       env: process.env.NODE_ENV || "development",
       websocket: `ws://${host === "0.0.0.0" ? "localhost" : host}:${port}/ws`,
-      health: `http://${host === "0.0.0.0" ? "localhost" : host}:${port}/health`,
+      health: `http://${
+        host === "0.0.0.0" ? "localhost" : host
+      }:${port}/health`,
     });
   } catch (err) {
-    loggers.lobby.error("Erreur au démarrage du serveur", {
+    console.error("Erreur au démarrage du serveur", {
       error: err instanceof Error ? err.message : "Unknown error",
     });
     process.exit(1);

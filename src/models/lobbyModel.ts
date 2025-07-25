@@ -1,5 +1,10 @@
 import { prisma } from "../lib/database.js";
 
+/**
+ * Modèle ultra-simplifié pour la gestion des lobbies
+ */
+
+// Créer un lobby
 export const createLobby = async (
   hostId: string,
   name: string,
@@ -10,11 +15,11 @@ export const createLobby = async (
       name: name || `Lobby de ${hostId}`,
       hostId,
       gameSettings: settings,
-      authorizedPlayers: [hostId], // L'hôte est automatiquement autorisé
+      authorizedPlayers: [hostId],
       players: {
         create: {
           userId: hostId,
-          status: "joined", // Changer "host" en "joined"
+          status: "joined",
         },
       },
     },
@@ -29,343 +34,8 @@ export const createLobby = async (
   });
 };
 
+// Récupérer un lobby
 export const getLobby = async (lobbyId: string) => {
-  const lobby = await prisma.gameLobby.findUnique({
-    where: { id: lobbyId },
-    include: {
-      host: true,
-      players: {
-        include: {
-          user: true,
-        },
-      },
-    },
-  });
-  if (lobby && lobby.players) {
-    console.log(
-      ">>> getLobby - players:",
-      lobby.players.map((p) => ({
-        id: p.userId,
-        validatedCountries: p.validatedCountries,
-        incorrectCountries: p.incorrectCountries,
-      }))
-    );
-  }
-  return lobby;
-};
-
-export const addPlayerToLobby = async (
-  lobbyId: string,
-  userId: string,
-  status: string
-) => {
-  return await prisma.lobbyPlayer.create({
-    data: {
-      lobbyId,
-      userId,
-      status,
-    },
-  });
-};
-
-export const getPlayerInLobby = async (lobbyId: string, userId: string) => {
-  return await prisma.lobbyPlayer.findUnique({
-    where: {
-      lobbyId_userId: {
-        lobbyId,
-        userId,
-      },
-    },
-  });
-};
-
-export const updatePlayerStatus = async (
-  lobbyId: string,
-  userId: string,
-  status: string
-) => {
-  return await prisma.lobbyPlayer.update({
-    where: {
-      lobbyId_userId: {
-        lobbyId,
-        userId,
-      },
-    },
-    data: {
-      status,
-    },
-  });
-};
-
-// export const updatePlayerDisconnectedAt = async (
-//   lobbyId: string,
-//   userId: string,
-//   disconnectedAt: Date | null
-// ) => {
-//   return await prisma.lobbyPlayer.update({
-//     where: {
-//       lobbyId_userId: {
-//         lobbyId,
-//         userId,
-//       },
-//     },
-//     data: {
-//       disconnectedAt,
-//     },
-//   });
-// };
-
-// export const updatePlayerPresenceStatus = async (
-//   lobbyId: string,
-//   userId: string,
-//   presenceStatus: string
-// ) => {
-//   return await prisma.lobbyPlayer.update({
-//     where: {
-//       lobbyId_userId: {
-//         lobbyId,
-//         userId,
-//       },
-//     },
-//     data: {
-//       presenceStatus,
-//     },
-//   });
-// };
-
-export const removePlayerFromLobby = async (
-  lobbyId: string,
-  userId: string
-) => {
-  // D'abord vérifier si le joueur existe dans le lobby
-  const existingPlayer = await prisma.lobbyPlayer.findUnique({
-    where: {
-      lobbyId_userId: {
-        lobbyId,
-        userId,
-      },
-    },
-  });
-
-  // Si le joueur n'existe pas, ne rien faire
-  if (!existingPlayer) {
-    console.log(
-      `Joueur ${userId} non trouvé dans le lobby ${lobbyId}, suppression ignorée`
-    );
-    return null;
-  }
-
-  // Supprimer le joueur s'il existe
-  return await prisma.lobbyPlayer.delete({
-    where: {
-      lobbyId_userId: {
-        lobbyId,
-        userId,
-      },
-    },
-  });
-};
-
-/**
- * Ajoute un utilisateur à la liste des joueurs autorisés
- */
-export const addAuthorizedPlayer = async (lobbyId: string, userId: string) => {
-  const lobby = await prisma.gameLobby.findUnique({
-    where: { id: lobbyId },
-    select: { authorizedPlayers: true },
-  });
-
-  if (!lobby) {
-    throw new Error("Lobby non trouvé");
-  }
-
-  // Ajouter l'utilisateur s'il n'est pas déjà dans la liste
-  if (!lobby.authorizedPlayers.includes(userId)) {
-    await prisma.gameLobby.update({
-      where: { id: lobbyId },
-      data: {
-        authorizedPlayers: {
-          push: userId,
-        },
-      },
-    });
-    console.log(
-      `Utilisateur ${userId} ajouté aux joueurs autorisés du lobby ${lobbyId}`
-    );
-  } else {
-    console.log(
-      `Utilisateur ${userId} déjà dans les joueurs autorisés du lobby ${lobbyId}`
-    );
-  }
-};
-
-/**
- * Met à jour la liste des joueurs autorisés (ajouter ou retirer)
- */
-export const updateLobbyAuthorizedPlayers = async (
-  lobbyId: string,
-  userId: string,
-  action: "add" | "remove"
-) => {
-  const lobby = await prisma.gameLobby.findUnique({
-    where: { id: lobbyId },
-    select: { authorizedPlayers: true },
-  });
-
-  if (!lobby) {
-    throw new Error("Lobby non trouvé");
-  }
-
-  let newAuthorizedPlayers: string[];
-
-  if (action === "add") {
-    // Ajouter l'utilisateur s'il n'est pas déjà dans la liste
-    if (!lobby.authorizedPlayers.includes(userId)) {
-      newAuthorizedPlayers = [...lobby.authorizedPlayers, userId];
-    } else {
-      return; // Déjà dans la liste
-    }
-  } else {
-    // Retirer l'utilisateur de la liste
-    newAuthorizedPlayers = lobby.authorizedPlayers.filter(
-      (id) => id !== userId
-    );
-  }
-
-  await prisma.gameLobby.update({
-    where: { id: lobbyId },
-    data: {
-      authorizedPlayers: newAuthorizedPlayers,
-    },
-  });
-
-  console.log(
-    `Utilisateur ${userId} ${action === "add" ? "ajouté à" : "retiré de"} la liste des joueurs autorisés du lobby ${lobbyId}`
-  );
-};
-
-export const updateLobbySettings = async (lobbyId: string, settings: any) => {
-  return await prisma.gameLobby.update({
-    where: { id: lobbyId },
-    data: {
-      gameSettings: settings,
-    },
-  });
-};
-
-export const updateLobbyStatus = async (lobbyId: string, status: string) => {
-  return await prisma.gameLobby.update({
-    where: { id: lobbyId },
-    data: {
-      status,
-    },
-  });
-};
-
-export const updateLobbyHost = async (lobbyId: string, newHostId: string) => {
-  return await prisma.gameLobby.update({
-    where: { id: lobbyId },
-    data: {
-      hostId: newHostId,
-    },
-  });
-};
-
-export const getLobbyPlayers = async (lobbyId: string) => {
-  return await prisma.lobbyPlayer.findMany({
-    where: { lobbyId },
-    include: {
-      user: true,
-    },
-  });
-};
-
-export const deleteLobby = async (lobbyId: string) => {
-  return await prisma.gameLobby.delete({
-    where: { id: lobbyId },
-  });
-};
-
-export const saveGameResult = async (
-  lobbyId: string,
-  userId: string,
-  score: number,
-  totalQuestions: number
-) => {
-  return await prisma.multiplayerGameResult.create({
-    data: {
-      lobbyId,
-      userId,
-      score,
-      totalQuestions,
-      completionTime: Math.floor(Date.now() / 1000), // Timestamp en secondes
-    },
-  });
-};
-
-export const saveGameState = async (lobbyId: string, gameState: any) => {
-  return await prisma.gameLobby.update({
-    where: { id: lobbyId },
-    data: {
-      gameState,
-    },
-  });
-};
-
-export const updatePlayerGameData = async (
-  lobbyId: string,
-  userId: string,
-  score: number,
-  progress: number,
-  validatedCountries: string[],
-  incorrectCountries: string[],
-  status?: string
-) => {
-  console.log(">>> updatePlayerGameData", {
-    lobbyId,
-    userId,
-    validatedCountries,
-    incorrectCountries,
-  });
-  const updateData: any = {
-    score,
-    progress,
-    validatedCountries,
-    incorrectCountries,
-  };
-
-  // Ajouter le statut s'il est fourni
-  if (status) {
-    updateData.status = status;
-  }
-
-  console.log(`🔍 updatePlayerGameData - Données à sauvegarder:`, {
-    lobbyId,
-    userId,
-    updateData,
-  });
-
-  const result = await prisma.lobbyPlayer.update({
-    where: {
-      lobbyId_userId: {
-        lobbyId,
-        userId,
-      },
-    },
-    data: updateData,
-  });
-
-  console.log(`✅ updatePlayerGameData - Résultat sauvegarde:`, {
-    userId: result.userId,
-    status: result.status,
-    score: result.score,
-    progress: result.progress,
-  });
-
-  return result;
-};
-
-export const getLobbyWithGameState = async (lobbyId: string) => {
   return await prisma.gameLobby.findUnique({
     where: { id: lobbyId },
     include: {
@@ -379,7 +49,130 @@ export const getLobbyWithGameState = async (lobbyId: string) => {
   });
 };
 
-export const getLobbiesByPlayer = async (userId: string) => {
+// Ajouter un joueur au lobby
+export const addPlayerToLobby = async (lobbyId: string, userId: string) => {
+  return await prisma.lobbyPlayer.create({
+    data: {
+      lobbyId,
+      userId,
+      status: "joined",
+    },
+  });
+};
+
+// Supprimer un joueur du lobby
+export const removePlayerFromLobby = async (
+  lobbyId: string,
+  userId: string
+) => {
+  return await prisma.lobbyPlayer.delete({
+    where: {
+      lobbyId_userId: {
+        lobbyId,
+        userId,
+      },
+    },
+  });
+};
+
+// Mettre à jour le statut d'un joueur
+export const updatePlayerStatus = async (
+  lobbyId: string,
+  userId: string,
+  status: string
+) => {
+  return await prisma.lobbyPlayer.update({
+    where: {
+      lobbyId_userId: {
+        lobbyId,
+        userId,
+      },
+    },
+    data: { status },
+  });
+};
+
+// Mettre à jour les données de jeu d'un joueur
+export const updatePlayerGameData = async (
+  lobbyId: string,
+  userId: string,
+  score: number,
+  progress: number,
+  validatedCountries: string[],
+  incorrectCountries: string[]
+) => {
+  return await prisma.lobbyPlayer.update({
+    where: {
+      lobbyId_userId: {
+        lobbyId,
+        userId,
+      },
+    },
+    data: {
+      score,
+      progress,
+      validatedCountries,
+      incorrectCountries,
+    },
+  });
+};
+
+// Mettre à jour le statut du lobby
+export const updateLobbyStatus = async (lobbyId: string, status: string) => {
+  return await prisma.gameLobby.update({
+    where: { id: lobbyId },
+    data: { status },
+  });
+};
+
+// Vérifier si tous les joueurs sont prêts
+export const areAllPlayersReady = async (lobbyId: string, hostId: string) => {
+  const players = await prisma.lobbyPlayer.findMany({
+    where: { lobbyId },
+  });
+
+  // Tous les joueurs, y compris l'hôte, doivent être prêts
+  return players.every((player: any) => player.status === "ready");
+};
+
+// Sauvegarder l'état du jeu
+export const saveGameState = async (lobbyId: string, gameState: any) => {
+  return await prisma.gameLobby.update({
+    where: { id: lobbyId },
+    data: { gameState },
+  });
+};
+
+// Sauvegarder un résultat de jeu
+export const saveGameResult = async (
+  lobbyId: string,
+  userId: string,
+  score: number,
+  totalQuestions: number,
+  completionTime?: number,
+  position?: number
+) => {
+  return await prisma.multiplayerGameResult.create({
+    data: {
+      lobbyId,
+      userId,
+      score,
+      totalQuestions,
+      completionTime,
+      position,
+    },
+  });
+};
+
+// Supprimer un lobby
+export const deleteLobby = async (lobbyId: string) => {
+  return await prisma.gameLobby.delete({
+    where: { id: lobbyId },
+  });
+};
+
+// Récupérer les lobbies d'un utilisateur
+export const findUserLobbies = async (userId: string) => {
   return await prisma.gameLobby.findMany({
     where: {
       players: {

@@ -4,18 +4,26 @@ import { requireAuth } from "../middleware/auth.js";
 
 export async function usersRoutes(fastify: FastifyInstance) {
   fastify.get(
-    "/tag",
+    "/",
     {
       preHandler: requireAuth,
     },
-    UserController.getUserTag
+    UserController.getUsers
   );
 
   fastify.get(
-    "/search",
+    "/:id",
     {
       preHandler: requireAuth,
     },
-    UserController.searchUsers
+    UserController.getUserById
+  );
+
+  fastify.get(
+    "/tag/:tag",
+    {
+      preHandler: requireAuth,
+    },
+    UserController.getUserByTag
   );
 }

@@ -1,30 +1,32 @@
 import { FastifyReply, FastifyRequest } from "fastify";
-import { handleError } from "../lib/errorHandler.js";
-import * as UserService from "../services/userService.js";
+import { asyncHandler } from "../lib/errorHandler.js";
+import { UserService } from "../services/userService.js";
 
-export const getUserTag = async (
-  request: FastifyRequest,
-  reply: FastifyReply
-) => {
-  try {
-    const userId = (request as any).user.id;
-    const result = await UserService.getUserOrCreateTag(userId);
+export const getUsers = asyncHandler(
+  async (request: FastifyRequest, reply: FastifyReply) => {
+    const result = await UserService.getUsersList();
     return reply.send(result);
-  } catch (error) {
-    return handleError(error, reply, request.log);
   }
-};
+);
 
-export const searchUsers = async (
-  request: FastifyRequest,
-  reply: FastifyReply
-) => {
-  try {
-    const userId = (request as any).user.id;
-    const { q } = request.query as { q: string };
-    const result = await UserService.searchUsers(q, userId);
-    return reply.send(result);
-  } catch (error) {
-    return handleError(error, reply, request.log);
+export const getUserById = asyncHandler(
+  async (
+    request: FastifyRequest<{ Params: { id: string } }>,
+    reply: FastifyReply
+  ) => {
+    const { id } = request.params;
+    const user = await UserService.getUserById(id);
+    return reply.send({ user });
   }
-};
+);
+
+export const getUserByTag = asyncHandler(
+  async (
+    request: FastifyRequest<{ Params: { tag: string } }>,
+    reply: FastifyReply
+  ) => {
+    const { tag } = request.params;
+    const user = await UserService.getUserByTag(tag);
+    return reply.send({ user });
+  }
+);

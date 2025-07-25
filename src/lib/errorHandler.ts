@@ -1,53 +1,89 @@
-import { FastifyBaseLogger, FastifyReply } from "fastify";
-import { ApiResponse } from "../types/index.js";
-import { BaseError, createErrorFromMessage } from "./errors.js";
+import { FastifyReply, FastifyRequest } from "fastify";
 
-/**
- * Gestionnaire d'erreurs centralisé pour l'application
- */
-export const handleError = (
-  error: unknown,
-  reply: FastifyReply,
-  logger: FastifyBaseLogger
-): FastifyReply => {
-  let appError: BaseError;
-
-  // Convertir l'erreur en AppError si ce n'est pas déjà le cas
-  if (error instanceof BaseError) {
-    appError = error;
-  } else if (error instanceof Error) {
-    appError = createErrorFromMessage(error.message);
-  } else {
-    appError = new BaseError("Erreur inconnue");
+// Types d'erreurs personnalisées
+export class AppError extends Error {
+  constructor(
+    message: string,
+    public statusCode: number = 400,
+    public isOperational: boolean = true
+  ) {
+    super(message);
+    this.name = "AppError";
   }
+}
 
-  // Logger l'erreur avec plus de détails
-  logger.error({
-    error: appError.message,
-    code: appError.code,
-    statusCode: appError.statusCode,
-    stack: appError.stack,
-    timestamp: new Date().toISOString(),
-  });
+export class ValidationError extends AppError {
+  constructor(message: string) {
+    super(message, 400);
+    this.name = "ValidationError";
+  }
+}
 
-  // Construire la réponse d'erreur
-  const errorResponse: ApiResponse = {
-    success: false,
-    error: appError.message,
-    code: appError.code,
-  };
+export class NotFoundError extends AppError {
+  constructor(resource: string) {
+    super(`${resource} non trouvé`, 404);
+    this.name = "NotFoundError";
+  }
+}
 
-  return reply.status(appError.statusCode).send(errorResponse);
-};
+export class ConflictError extends AppError {
+  constructor(message: string) {
+    super(message, 409);
+    this.name = "ConflictError";
+  }
+}
 
-/**
- * Middleware pour capturer les erreurs non gérées
- */
+// Gestionnaire d'erreur global
 export const errorHandler = (
   error: Error,
-  request: any,
+  request: FastifyRequest,
   reply: FastifyReply
 ) => {
-  const logger = request.log || console;
-  return handleError(error, reply, logger);
+  // Log de l'erreur
+  request.log.error(error);
+
+  // Erreurs personnalisées
+  if (error instanceof AppError) {
+    return reply.status(error.statusCode).send({
+      error: error.message,
+      statusCode: error.statusCode,
+    });
+  }
+
+  // Erreurs de validation Zod
+  if (error.name === "ZodError") {
+    return reply.status(400).send({
+      error: "Données invalides",
+      details: error.message,
+    });
+  }
+
+  // Erreurs Prisma
+  if (error.name === "PrismaClientKnownRequestError") {
+    return reply.status(400).send({
+      error: "Erreur de base de données",
+    });
+  }
+
+  // Erreurs par défaut
+  const statusCode = 500;
+  const message = process.env.NODE_ENV === "production" 
+    ? "Erreur interne du serveur" 
+    : error.message;
+
+  return reply.status(statusCode).send({
+    error: message,
+    statusCode,
+  });
 };
+
+// Wrapper pour les contrôleurs
+export const asyncHandler = (fn: Function) => {
+  return async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      return await fn(request, reply);
+    } catch (error) {
+      return errorHandler(error as Error, request, reply);
+    }
+  };
+}; 
