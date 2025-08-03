@@ -1,4 +1,4 @@
-import { WebSocket } from "@fastify/websocket";
+import { WebSocket } from "ws";
 import * as LobbyModel from "../../models/lobbyModel.js";
 import { FriendService } from "../../services/friendService.js";
 import { BroadcastManager } from "../lobby/broadcastManager.js";
