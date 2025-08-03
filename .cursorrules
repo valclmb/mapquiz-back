@@ -53,7 +53,13 @@ Generate code, corrections, and refactorings that comply with the basic principl
 ### Data
 
 - Don't abuse primitive types and encapsulate data in composite types
-- Avoid data validations in functions and use classes with internal validation
+- Use Zod for runtime validation and type inference
+- Create schemas for all input data (WebSocket payloads, API requests)
+- Use z.infer<typeof schema> for automatic type generation
+- Implement validation at the boundary (handlers, WebSocket messages)
+- Provide meaningful error messages in schemas
+- Use z.coerce for type transformations when needed
+- Prefer composition over inheritance for complex schemas
 - Prefer immutability for data
 - Use readonly for data that doesn't change
 - Use as const for literals that don't change

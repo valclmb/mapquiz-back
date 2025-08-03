@@ -1,66 +1,47 @@
 import { FastifyReply, FastifyRequest } from "fastify";
-import * as ScoreService from "../services/scoreService.js";
+import { asyncHandler } from "../lib/errorHandler.js";
+import { ScoreService } from "../services/scoreService.js";
 
 interface SaveScoreRequest {
-  score: number;
-  totalQuestions: number;
-  selectedRegions: string[];
-  gameMode: string;
-  duration?: number;
+  Body: {
+    score: number;
+    totalQuestions: number;
+    selectedRegions: string[];
+    gameMode: string;
+    duration?: number;
+  };
 }
 
-export const saveScore = async (
-  request: FastifyRequest<{ Body: SaveScoreRequest }>,
-  reply: FastifyReply
-) => {
-  try {
+export const saveScore = asyncHandler(
+  async (request: FastifyRequest<SaveScoreRequest>, reply: FastifyReply) => {
     const userId = (request as any).user.id;
     const { score, totalQuestions, selectedRegions, gameMode, duration } =
       request.body;
 
-    const result = await ScoreService.saveScore({
+    const result = await ScoreService.saveScore(
       userId,
       score,
       totalQuestions,
       selectedRegions,
       gameMode,
-      duration,
-    });
-
+      duration
+    );
     return reply.send(result);
-  } catch (error) {
-    return reply
-      .status(500)
-      .send({ error: "Erreur lors de la sauvegarde du score" });
   }
-};
+);
 
-export const getScoreHistory = async (
-  request: FastifyRequest,
-  reply: FastifyReply
-) => {
-  try {
+export const getScoreHistory = asyncHandler(
+  async (request: FastifyRequest, reply: FastifyReply) => {
     const userId = (request as any).user.id;
-    const history = await ScoreService.getScoreHistory(userId);
-    return reply.send(history);
-  } catch (error) {
-    return reply
-      .status(500)
-      .send({ error: "Erreur lors de la récupération de l'historique" });
+    const result = await ScoreService.getScoreHistory(userId);
+    return reply.send(result);
   }
-};
+);
 
-export const getStats = async (
-  request: FastifyRequest,
-  reply: FastifyReply
-) => {
-  try {
+export const getUserStats = asyncHandler(
+  async (request: FastifyRequest, reply: FastifyReply) => {
     const userId = (request as any).user.id;
-    const stats = await ScoreService.getStats(userId);
-    return reply.send(stats);
-  } catch (error) {
-    return reply
-      .status(500)
-      .send({ error: "Erreur lors de la récupération des statistiques" });
+    const result = await ScoreService.getUserStats(userId);
+    return reply.send(result);
   }
-};
+);

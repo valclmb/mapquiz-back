@@ -1,25 +1,46 @@
-import { LobbySettings } from "./lobby.js";
-
 // Types pour les requêtes API
+
 export interface AddFriendRequest {
-  tag: string;
+  Body: { tag: string };
 }
 
 export interface RemoveFriendRequest {
-  friendId: string;
+  Body: { friendId: string };
 }
 
 export interface FriendRequestActionRequest {
-  action: "accept" | "reject";
+  Body: { action: "accept" | "reject" };
+  Params: { id: string };
+}
+
+export interface SaveScoreRequest {
+  Body: {
+    score: number;
+    totalQuestions: number;
+    selectedRegions: string[];
+    gameMode: string;
+    duration?: number;
+  };
 }
 
 export interface CreateLobbyRequest {
-  name: string;
-  settings: LobbySettings;
+  Body: {
+    name: string;
+    settings: {
+      selectedRegions: string[];
+      gameMode: string;
+    };
+  };
 }
 
 export interface UpdateLobbySettingsRequest {
-  settings: LobbySettings;
+  Body: {
+    settings: {
+      selectedRegions: string[];
+      gameMode: string;
+    };
+  };
+  Params: { lobbyId: string };
 }
 
 // Types pour les réponses API

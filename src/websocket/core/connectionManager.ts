@@ -1,3 +1,5 @@
+import { WebSocket } from "ws";
+
 const connections = new Map<string, WebSocket>();
 
 export function addConnection(userId: string, socket: WebSocket) {

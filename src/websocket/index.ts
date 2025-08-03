@@ -5,14 +5,9 @@ export { WebSocketMessageHandler } from "./messaging/messageHandler.js";
 
 // Export des gestionnaires spécialisés
 export { BroadcastManager } from "./lobby/broadcastManager.js";
-export { GameStateManager } from "./lobby/gameStateManager.js";
-export { PlayerManager } from "./lobby/playerManager.js";
+export { LobbyLifecycleManager } from "./lobby/lobbyLifecycle.js";
 
 // Export des utilitaires
 export * from "./core/authentication.js";
 export * from "./core/connectionManager.js";
 export * from "./messaging/types.js";
-export * from "./utils/constants.js";
-
-// Export du gestionnaire de lobby (maintenu pour compatibilité)
-export * from "./lobby/lobbyManager.js";

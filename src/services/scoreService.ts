@@ -1,88 +1,76 @@
 import * as ScoreModel from "../models/scoreModel.js";
+import * as UserModel from "../models/userModel.js";
 
-interface SaveScoreData {
-  userId: string;
-  score: number;
-  totalQuestions: number;
-  selectedRegions: string[];
-  gameMode: string;
-  duration?: number;
-}
+/**
+ * Service unifié pour la gestion des scores
+ */
+export class ScoreService {
+  /**
+   * Sauvegarde un score
+   */
+  static async saveScore(
+    userId: string,
+    score: number,
+    totalQuestions: number,
+    selectedRegions: string[],
+    gameMode: string = "quiz",
+    duration?: number
+  ) {
+    const user = await UserModel.findUserById(userId);
+    if (!user) {
+      throw new Error("Utilisateur non trouvé");
+    }
 
-export const saveScore = async (data: SaveScoreData) => {
-  return await ScoreModel.createScore(data);
-};
+    const gameScore = await ScoreModel.createScore({
+      userId,
+      score,
+      totalQuestions,
+      selectedRegions,
+      gameMode,
+      duration,
+    });
 
-export const getScoreHistory = async (userId: string) => {
-  const scores = await ScoreModel.getUserScores(userId); // Déjà limité à 10 scores par défaut
-
-  // Transformer les données au format attendu par le frontend
-  return scores
-    .map((item) => ({
-      id: item.id,
-      score: item.score,
-      totalQuestions: item.totalQuestions,
-      selectedRegions: item.selectedRegions,
-      gameMode: item.gameMode,
-      duration: item.duration,
-      // Formater la date pour l'affichage dans le graphique
-      date: new Date(item.createdAt).toLocaleDateString("fr-FR", {
-        day: "2-digit",
-        month: "2-digit",
-      }),
-      // Garder createdAt pour compatibilité
-      createdAt: item.createdAt,
-    }))
-    .reverse(); // Ordre chronologique
-};
-
-export const getStats = async (userId: string) => {
-  const scores = await ScoreModel.getUserScores(userId);
-
-  if (scores.length === 0) {
     return {
-      totalGames: 0,
-      averageScore: 0,
-      bestScore: 0,
-      totalCorrectAnswers: 0,
+      success: true,
+      score: gameScore,
     };
   }
 
-  const totalGames = scores.length;
-  const totalCorrectAnswers = scores.reduce(
-    (sum, score) => sum + score.score,
-    0
-  );
-  const totalQuestions = scores.reduce(
-    (sum, score) => sum + score.totalQuestions,
-    0
-  );
-  const averageScore =
-    totalQuestions > 0 ? (totalCorrectAnswers / totalQuestions) * 100 : 0;
-  const bestScore = Math.max(
-    ...scores.map((s) => (s.score / s.totalQuestions) * 100)
-  );
+  /**
+   * Récupère l'historique des scores d'un utilisateur
+   */
+  static async getScoreHistory(userId: string) {
+    const user = await UserModel.findUserById(userId);
+    if (!user) {
+      throw new Error("Utilisateur non trouvé");
+    }
 
-  return {
-    totalGames,
-    averageScore: Math.round(averageScore * 100) / 100,
-    bestScore: Math.round(bestScore * 100) / 100,
-    totalCorrectAnswers,
-  };
-};
+    const scores = await ScoreModel.getUserScores(userId);
 
-// Nouveau type pour le format des données du graphique
-export interface ChartScoreItem {
-  id: string;
-  date: string; // Format dd/MM
-  score: number; // Pourcentage arrondi
-  raw: {
-    id: string;
-    score: number;
-    totalQuestions: number;
-    selectedRegions: string[];
-    gameMode: string;
-    duration: number;
-    createdAt: string;
-  };
+    // Transformer les données pour le frontend (minimal)
+    return scores
+      .map((item) => ({
+        score: item.score,
+        duration: item.duration || 0,
+        selectedRegions: item.selectedRegions,
+        date: item.createdAt.toLocaleDateString("fr-FR", {
+          day: "2-digit",
+          month: "2-digit",
+        }),
+      }))
+      .reverse(); // Du plus ancien au plus récent pour le graphique
+  }
+
+  /**
+   * Récupère les statistiques d'un utilisateur
+   */
+  static async getUserStats(userId: string) {
+    const user = await UserModel.findUserById(userId);
+    if (!user) {
+      throw new Error("Utilisateur non trouvé");
+    }
+
+    const stats = await ScoreModel.getScoreStats(userId);
+    return stats;
+  }
 }
