@@ -111,8 +111,22 @@ export const handleUpdateLobbySettings = async (
   userId: string
 ) => {
   const { lobbyId, settings } = payload;
-  // TODO: Implémenter la logique de mise à jour des paramètres
-  return { success: true };
+
+  const success = await LobbyService.updateLobbySettings(
+    userId,
+    lobbyId,
+    settings
+  );
+
+  // Broadcast du lobby_update après la mise à jour des paramètres
+  if (success) {
+    const lobbyInMemory = LobbyLifecycleManager.getLobbyInMemory(lobbyId);
+    if (lobbyInMemory) {
+      await BroadcastManager.broadcastLobbyUpdate(lobbyId, lobbyInMemory);
+    }
+  }
+
+  return { success };
 };
 
 export const handleSetPlayerReady = async (payload: any, userId: string) => {

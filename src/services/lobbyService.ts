@@ -1,6 +1,7 @@
 import * as LobbyModel from "../models/lobbyModel.js";
 import * as UserModel from "../models/userModel.js";
 import { sendToUser } from "../websocket/core/connectionManager.js";
+import { LobbyLifecycleManager } from "../websocket/lobby/lobbyLifecycle.js";
 
 /**
  * Service principal pour la gestion des lobbies
@@ -275,6 +276,40 @@ export class LobbyService {
     } catch (error) {
       console.error("Erreur lors de la récupération des résultats:", error);
       throw error;
+    }
+  }
+
+  /**
+   * Met à jour les paramètres d'un lobby
+   */
+  static async updateLobbySettings(
+    userId: string,
+    lobbyId: string,
+    settings: any
+  ): Promise<boolean> {
+    try {
+      // Vérifier que l'utilisateur est bien l'hôte du lobby
+      const lobby = await LobbyModel.getLobby(lobbyId);
+      if (!lobby || lobby.hostId !== userId) {
+        throw new Error("Non autorisé à modifier les paramètres de ce lobby");
+      }
+
+      // Mettre à jour les paramètres du lobby dans la base de données
+      await LobbyModel.updateLobbySettings(lobbyId, settings);
+
+      // Mettre à jour le lobby en mémoire
+      const lobbyInMemory = LobbyLifecycleManager.getLobbyInMemory(lobbyId);
+      if (lobbyInMemory) {
+        lobbyInMemory.settings = settings;
+      }
+
+      return true;
+    } catch (error) {
+      console.error(
+        "Erreur lors de la mise à jour des paramètres du lobby:",
+        error
+      );
+      return false;
     }
   }
 

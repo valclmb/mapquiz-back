@@ -117,6 +117,16 @@ export const updatePlayerGameData = async (
   });
 };
 
+// Mettre à jour les paramètres du lobby
+export const updateLobbySettings = async (lobbyId: string, settings: any) => {
+  return await prisma.gameLobby.update({
+    where: { id: lobbyId },
+    data: {
+      gameSettings: settings,
+    },
+  });
+};
+
 // Mettre à jour le statut du lobby
 export const updateLobbyStatus = async (lobbyId: string, status: string) => {
   return await prisma.gameLobby.update({
