@@ -178,14 +178,6 @@ export class GameService {
     // Vérifier si le joueur a terminé la partie
     if (updatedPlayer.progress >= 100) {
       this.checkGameCompletion(lobbyId, playerId);
-    } else {
-      // Vérifier si le joueur a répondu à tous les pays actifs (même s'il n'en a validé aucun)
-      const totalAnswered =
-        updatedPlayer.validatedCountries.length +
-        updatedPlayer.incorrectCountries.length;
-      if (totalQuestions > 0 && totalAnswered >= totalQuestions) {
-        this.checkGameCompletion(lobbyId, playerId);
-      }
     }
 
     BroadcastManager.broadcastPlayerProgressUpdate(lobbyId, lobby);
@@ -243,10 +235,11 @@ export class GameService {
       );
     }
 
-    BroadcastManager.broadcastGameEnd(lobbyId);
-
     // Diffuser un lobby_update avec le status finished pour synchroniser le frontend
     await BroadcastManager.broadcastLobbyUpdate(lobbyId, lobby);
+
+    // Envoyer game_end après le lobby_update
+    BroadcastManager.broadcastGameEnd(lobbyId);
   }
 
   /**
