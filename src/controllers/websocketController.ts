@@ -1,6 +1,7 @@
 import { FriendService } from "../services/friendService.js";
 import { GameService } from "../services/gameService.js";
 
+import * as LobbyModel from "../models/lobbyModel.js";
 import { LobbyService } from "../services/lobbyService.js";
 import { PlayerService } from "../services/playerService.js";
 import { sendToUser } from "../websocket/core/connectionManager.js";
@@ -71,19 +72,14 @@ export const handleJoinLobby = async (payload: any, userId: string) => {
 
   // Si le lobby n'est pas en mémoire, essayer de le restaurer depuis la DB
   if (!lobby) {
-    console.log(
-      `🔍 Lobby ${lobbyId} non trouvé en mémoire, tentative de restauration depuis la DB`
-    );
     const lobbyFromDB = await LobbyService.getLobby(lobbyId);
     if (lobbyFromDB) {
-      console.log(`🔍 Restauration du lobby ${lobbyId} depuis la DB`);
       LobbyLifecycleManager.restoreLobbyFromDatabase(lobbyId, lobbyFromDB);
       lobby = LobbyLifecycleManager.getLobbyInMemory(lobbyId);
     }
   }
 
   if (!lobby) {
-    console.log(`🔍 Lobby ${lobbyId} non trouvé en DB non plus`);
     return { success: false };
   }
 
@@ -286,24 +282,70 @@ export const handleLeaveGame = async (payload: any, userId: string) => {
 export const handleRemovePlayer = async (payload: any, userId: string) => {
   const { lobbyId, playerId } = payload;
 
-  const lobby = LobbyLifecycleManager.getLobbyInMemory(lobbyId);
-  if (!lobby) return { success: false };
-
-  lobby.players.delete(playerId);
-
-  // Si plus de joueurs, supprimer le lobby
-  if (lobby.players.size === 0) {
-    LobbyLifecycleManager.scheduleLobbyDeletion(lobbyId);
-  } else {
-    // Si l'hôte part, transférer l'hôte au premier joueur restant
-    if (playerId === lobby.hostId) {
-      const firstPlayer = lobby.players.keys().next().value;
-      lobby.hostId = firstPlayer;
-    }
-    await BroadcastManager.broadcastLobbyUpdate(lobbyId, lobby);
+  if (!lobbyId) {
+    throw new Error("lobbyId requis");
+  }
+  if (!playerId) {
+    throw new Error("playerId requis");
   }
 
-  return { success: true };
+  try {
+    // Vérifier que l'utilisateur est l'hôte du lobby
+    const lobbyFromDB = await LobbyService.getLobby(lobbyId);
+    if (!lobbyFromDB) {
+      throw new Error("Lobby non trouvé");
+    }
+
+    if (lobbyFromDB.hostId !== userId) {
+      throw new Error("Seul l'hôte peut supprimer des joueurs");
+    }
+
+    if (lobbyFromDB.hostId === playerId) {
+      throw new Error("L'hôte ne peut pas se supprimer lui-même");
+    }
+
+    // Supprimer le joueur du lobby en base de données
+    await LobbyModel.removePlayerFromLobby(lobbyId, playerId);
+
+    // Supprimer le joueur du lobby en mémoire
+    const lobby = LobbyLifecycleManager.getLobbyInMemory(lobbyId);
+    if (lobby) {
+      lobby.players.delete(playerId);
+    }
+
+    // Retirer le joueur de la liste des joueurs autorisés
+    await LobbyModel.updateLobbyAuthorizedPlayers(lobbyId, playerId, "remove");
+
+    // Diffuser la mise à jour du lobby
+    if (lobby) {
+      await BroadcastManager.broadcastLobbyUpdate(lobbyId, lobby);
+    }
+
+    // Envoyer un message au joueur supprimé pour qu'il quitte le lobby
+    sendToUser(playerId, {
+      type: "player_removed",
+      payload: {
+        lobbyId,
+        message: "Vous avez été expulsé du lobby par l'hôte",
+      },
+    });
+
+    return {
+      lobbyId,
+      playerId,
+      message: "Joueur supprimé avec succès",
+    };
+  } catch (error) {
+    console.error(
+      `Erreur lors de la suppression du joueur ${playerId} du lobby ${lobbyId}:`,
+      error
+    );
+    throw new Error(
+      `Impossible de supprimer le joueur: ${
+        error instanceof Error ? error.message : "Erreur inconnue"
+      }`
+    );
+  }
 };
 
 export const handleUpdatePlayerStatus = async (

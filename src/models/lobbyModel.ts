@@ -237,3 +237,50 @@ export const addAuthorizedPlayer = async (lobbyId: string, userId: string) => {
     data: { authorizedPlayers },
   });
 };
+
+/**
+ * Met à jour la liste des joueurs autorisés (ajouter ou retirer)
+ */
+export const updateLobbyAuthorizedPlayers = async (
+  lobbyId: string,
+  userId: string,
+  action: "add" | "remove"
+) => {
+  const lobby = await prisma.gameLobby.findUnique({
+    where: { id: lobbyId },
+    select: { authorizedPlayers: true },
+  });
+
+  if (!lobby) {
+    throw new Error("Lobby non trouvé");
+  }
+
+  let newAuthorizedPlayers: string[];
+
+  if (action === "add") {
+    // Ajouter l'utilisateur s'il n'est pas déjà dans la liste
+    if (!lobby.authorizedPlayers.includes(userId)) {
+      newAuthorizedPlayers = [...lobby.authorizedPlayers, userId];
+    } else {
+      return; // Déjà dans la liste
+    }
+  } else {
+    // Retirer l'utilisateur de la liste
+    newAuthorizedPlayers = lobby.authorizedPlayers.filter(
+      (id) => id !== userId
+    );
+  }
+
+  await prisma.gameLobby.update({
+    where: { id: lobbyId },
+    data: {
+      authorizedPlayers: newAuthorizedPlayers,
+    },
+  });
+
+  console.log(
+    `Utilisateur ${userId} ${
+      action === "add" ? "ajouté à" : "retiré de"
+    } la liste des joueurs autorisés du lobby ${lobbyId}`
+  );
+};
