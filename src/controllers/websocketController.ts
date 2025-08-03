@@ -2,6 +2,7 @@ import { FriendService } from "../services/friendService.js";
 import { GameService } from "../services/gameService.js";
 
 import * as LobbyModel from "../models/lobbyModel.js";
+import * as UserModel from "../models/userModel.js";
 import { LobbyService } from "../services/lobbyService.js";
 import { PlayerService } from "../services/playerService.js";
 import { sendToUser } from "../websocket/core/connectionManager.js";
@@ -103,24 +104,56 @@ export const handleJoinLobby = async (payload: any, userId: string) => {
 export const handleLeaveLobby = async (payload: any, userId: string) => {
   const { lobbyId } = payload;
 
-  const lobby = LobbyLifecycleManager.getLobbyInMemory(lobbyId);
-  if (!lobby) return { success: false };
-
-  lobby.players.delete(userId);
-
-  // Si plus de joueurs, supprimer le lobby
-  if (lobby.players.size === 0) {
-    LobbyLifecycleManager.scheduleLobbyDeletion(lobbyId);
-  } else {
-    // Si l'hôte part, transférer l'hôte au premier joueur restant
-    if (userId === lobby.hostId) {
-      const firstPlayer = lobby.players.keys().next().value;
-      lobby.hostId = firstPlayer;
-    }
-    await BroadcastManager.broadcastLobbyUpdate(lobbyId, lobby);
+  if (!lobbyId) {
+    throw new Error("lobbyId requis");
   }
 
-  return { success: true };
+  try {
+    // Récupérer les informations du joueur avant de le supprimer
+    const user = await UserModel.findUserById(userId);
+    const playerName = user?.name || "Joueur inconnu";
+
+    // Supprimer le joueur du lobby en base de données
+    await LobbyModel.removePlayerFromLobby(lobbyId, userId);
+
+    // Supprimer le joueur du lobby en mémoire
+    const lobby = LobbyLifecycleManager.getLobbyInMemory(lobbyId);
+    if (lobby) {
+      lobby.players.delete(userId);
+
+      // Diffuser que le joueur a quitté le lobby
+      BroadcastManager.broadcastPlayerLeftGame(lobbyId, userId, playerName);
+
+      // Si plus de joueurs, supprimer le lobby
+      if (lobby.players.size === 0) {
+        LobbyLifecycleManager.scheduleLobbyDeletion(lobbyId);
+      } else {
+        // Si l'hôte part, transférer l'hôte au premier joueur restant
+        if (userId === lobby.hostId) {
+          const firstPlayer = lobby.players.keys().next().value;
+          lobby.hostId = firstPlayer;
+
+          // Mettre à jour l'hôte en base de données
+          await LobbyModel.updateLobbyHost(lobbyId, firstPlayer);
+        }
+
+        // Diffuser la mise à jour du lobby
+        await BroadcastManager.broadcastLobbyUpdate(lobbyId, lobby);
+      }
+    }
+
+    return { success: true, message: "Lobby quitté" };
+  } catch (error) {
+    console.error(
+      `Erreur lors de la sortie du lobby ${lobbyId} par l'utilisateur ${userId}:`,
+      error
+    );
+    throw new Error(
+      `Impossible de quitter le lobby: ${
+        error instanceof Error ? error.message : "Erreur inconnue"
+      }`
+    );
+  }
 };
 
 export const handleUpdateLobbySettings = async (

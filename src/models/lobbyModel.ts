@@ -135,6 +135,16 @@ export const updateLobbyStatus = async (lobbyId: string, status: string) => {
   });
 };
 
+// Mettre à jour l'hôte du lobby
+export const updateLobbyHost = async (lobbyId: string, newHostId: string) => {
+  return await prisma.gameLobby.update({
+    where: { id: lobbyId },
+    data: {
+      hostId: newHostId,
+    },
+  });
+};
+
 // Vérifier si tous les joueurs sont prêts
 export const areAllPlayersReady = async (lobbyId: string, hostId: string) => {
   const players = await prisma.lobbyPlayer.findMany({
