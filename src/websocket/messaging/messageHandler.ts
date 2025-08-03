@@ -226,6 +226,19 @@ export class WebSocketMessageHandler {
           await BroadcastManager.broadcastLobbyUpdate(payload.lobbyId, lobby);
         }
       }
+      // Ajout du broadcast après la réponse de succès pour join_lobby
+      if (type === "join_lobby" && payload?.lobbyId) {
+        console.log(
+          "🔍 Tentative de broadcast après join_lobby pour lobbyId:",
+          payload.lobbyId
+        );
+        const lobby = LobbyLifecycleManager.getLobbyInMemory(payload.lobbyId);
+        console.log("🔍 Lobby trouvé en mémoire:", lobby ? "oui" : "non");
+        if (lobby) {
+          console.log("🔍 Envoi du broadcastLobbyUpdate");
+          await BroadcastManager.broadcastLobbyUpdate(payload.lobbyId, lobby);
+        }
+      }
     } catch (error) {
       console.error(`Erreur lors du traitement du message ${type}:`, error);
       const errorMessage =

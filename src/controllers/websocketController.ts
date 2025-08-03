@@ -67,8 +67,25 @@ export const handleInviteToLobby = async (payload: any, userId: string) => {
 export const handleJoinLobby = async (payload: any, userId: string) => {
   const { lobbyId } = payload;
 
-  const lobby = LobbyLifecycleManager.getLobbyInMemory(lobbyId);
-  if (!lobby) return { success: false };
+  let lobby = LobbyLifecycleManager.getLobbyInMemory(lobbyId);
+
+  // Si le lobby n'est pas en mémoire, essayer de le restaurer depuis la DB
+  if (!lobby) {
+    console.log(
+      `🔍 Lobby ${lobbyId} non trouvé en mémoire, tentative de restauration depuis la DB`
+    );
+    const lobbyFromDB = await LobbyService.getLobby(lobbyId);
+    if (lobbyFromDB) {
+      console.log(`🔍 Restauration du lobby ${lobbyId} depuis la DB`);
+      LobbyLifecycleManager.restoreLobbyFromDatabase(lobbyId, lobbyFromDB);
+      lobby = LobbyLifecycleManager.getLobbyInMemory(lobbyId);
+    }
+  }
+
+  if (!lobby) {
+    console.log(`🔍 Lobby ${lobbyId} non trouvé en DB non plus`);
+    return { success: false };
+  }
 
   // Si le lobby était vide et en attente de suppression, on annule le timer
   if (lobby.players.size === 0) {
@@ -77,8 +94,12 @@ export const handleJoinLobby = async (payload: any, userId: string) => {
 
   lobby.players.set(userId, PlayerService.createPlayer("User"));
 
-  // Broadcast pour informer les autres joueurs
-  await BroadcastManager.broadcastLobbyUpdate(lobbyId, lobby);
+  // Ajouter le joueur en base de données aussi
+  try {
+    await LobbyService.addPlayerToLobby(lobbyId, userId, "joined");
+  } catch (error) {
+    console.error("Erreur lors de l'ajout du joueur en DB:", error);
+  }
 
   return { success: true };
 };

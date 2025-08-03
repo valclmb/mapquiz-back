@@ -351,4 +351,21 @@ export class LobbyService {
 
     return { success: true, message: "Invitation envoyée" };
   }
+
+  /**
+   * Ajoute un joueur à un lobby
+   */
+  static async addPlayerToLobby(
+    lobbyId: string,
+    userId: string,
+    status: string = "joined"
+  ): Promise<boolean> {
+    try {
+      await LobbyModel.addPlayerToLobby(lobbyId, userId);
+      return true;
+    } catch (error) {
+      console.error("Erreur lors de l'ajout du joueur au lobby:", error);
+      return false;
+    }
+  }
 }
