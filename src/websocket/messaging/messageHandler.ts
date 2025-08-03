@@ -1,6 +1,7 @@
 import { WebSocket } from "@fastify/websocket";
 import {
   handleCreateLobby,
+  handleGetGameResults,
   handleGetGameState,
   handleGetLobbyState,
   handleInviteToLobby,
@@ -126,6 +127,13 @@ const messageHandlers = new Map<string, MessageHandler>([
     WS_MESSAGE_TYPES.GET_LOBBY_STATE,
     async (payload, userId) => {
       return await handleGetLobbyState(payload, userId);
+    },
+  ],
+
+  [
+    WS_MESSAGE_TYPES.GET_GAME_RESULTS,
+    async (payload, userId) => {
+      return await handleGetGameResults(payload, userId);
     },
   ],
 

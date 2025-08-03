@@ -216,9 +216,16 @@ export class GameService {
     }
 
     if (allFinished) {
+      console.log(
+        `🎯 GameService.checkGameCompletion - Tous les joueurs ont terminé, appel de endGame pour le lobby ${lobbyId}`
+      );
       this.endGame(lobbyId).catch((error) => {
         console.error("Erreur lors de la fin de jeu:", error);
       });
+    } else {
+      console.log(
+        `⏳ GameService.checkGameCompletion - Pas tous les joueurs ont terminé, pas de fin de jeu`
+      );
     }
   }
 
@@ -226,17 +233,28 @@ export class GameService {
    * Termine la partie
    */
   private static async endGame(lobbyId: string): Promise<void> {
+    console.log(`🏁 GameService.endGame - Début pour le lobby ${lobbyId}`);
+
     const lobby = LobbyLifecycleManager.getLobbyInMemory(lobbyId);
-    if (!lobby) return;
+    if (!lobby) {
+      console.log(
+        `❌ GameService.endGame - Lobby ${lobbyId} non trouvé en mémoire`
+      );
+      return;
+    }
 
     lobby.status = "finished";
+    console.log(
+      `✅ GameService.endGame - Statut du lobby mis à jour vers 'finished' en mémoire`
+    );
+
     const rankings = PlayerService.calculateRankings(lobby.players);
 
     // Mettre à jour le statut du lobby en base de données
     try {
-      // TODO: Ajouter une méthode updateLobbyStatus dans LobbyService
+      await LobbyService.updateLobbyStatus(lobbyId, "finished");
       console.log(
-        `Statut du lobby ${lobbyId} mis à jour en base de données vers 'finished'`
+        `✅ GameService.endGame - Statut du lobby mis à jour vers 'finished' en base de données`
       );
     } catch (error) {
       console.error(
@@ -246,8 +264,13 @@ export class GameService {
     }
 
     BroadcastManager.broadcastGameEnd(lobbyId);
+    console.log(`📢 GameService.endGame - game_end diffusé`);
+
     // Diffuser un lobby_update avec le status finished pour synchroniser le frontend
     await BroadcastManager.broadcastLobbyUpdate(lobbyId, lobby);
+    console.log(
+      `📢 GameService.endGame - lobby_update diffusé avec statut finished`
+    );
   }
 
   /**

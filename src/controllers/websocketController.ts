@@ -387,6 +387,36 @@ export const handleGetLobbyState = async (payload: any, userId: string) => {
 };
 
 /**
+ * Gère la récupération des résultats de jeu
+ */
+export const handleGetGameResults = async (payload: any, userId: string) => {
+  const { lobbyId } = payload;
+  if (!lobbyId) {
+    throw new Error("lobbyId requis");
+  }
+
+  try {
+    const results = await LobbyService.getGameResults(lobbyId, userId);
+
+    return {
+      lobbyId,
+      rankings: results.rankings,
+      hostId: results.hostId,
+    };
+  } catch (error) {
+    console.error(
+      `Erreur lors de la récupération des résultats pour le lobby ${lobbyId}:`,
+      error
+    );
+    throw new Error(
+      `Impossible de récupérer les résultats: ${
+        error instanceof Error ? error.message : "Erreur inconnue"
+      }`
+    );
+  }
+};
+
+/**
  * Récupère l'état du jeu depuis la mémoire
  */
 async function getGameStateFromMemory(

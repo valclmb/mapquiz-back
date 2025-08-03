@@ -162,6 +162,22 @@ export class LobbyService {
   }
 
   /**
+   * Met à jour le statut du lobby en base de données
+   */
+  static async updateLobbyStatus(
+    lobbyId: string,
+    status: string
+  ): Promise<boolean> {
+    try {
+      await LobbyModel.updateLobbyStatus(lobbyId, status);
+      return true;
+    } catch (error) {
+      console.error("Erreur lors de la mise à jour du statut du lobby:", error);
+      return false;
+    }
+  }
+
+  /**
    * Sauvegarde l'état du jeu en base de données
    */
   static async saveGameState(
@@ -209,6 +225,86 @@ export class LobbyService {
     } catch (error) {
       console.error("Erreur lors de la suppression du lobby:", error);
       return false;
+    }
+  }
+
+  /**
+   * Récupère les résultats d'une partie terminée
+   */
+  static async getGameResults(lobbyId: string, userId: string) {
+    console.log(
+      `🔍 LobbyService.getGameResults - Début pour lobbyId: ${lobbyId}, userId: ${userId}`
+    );
+
+    try {
+      // Vérifier que le joueur est dans le lobby
+      const player = await LobbyModel.getPlayerInLobby(lobbyId, userId);
+      if (!player) {
+        console.log(
+          `❌ LobbyService.getGameResults - Joueur ${userId} non trouvé dans le lobby ${lobbyId}`
+        );
+        throw new Error("Vous n'êtes pas dans ce lobby");
+      }
+      console.log(
+        `✅ LobbyService.getGameResults - Joueur ${userId} trouvé dans le lobby`
+      );
+
+      // Récupérer le lobby
+      const lobby = await LobbyModel.getLobby(lobbyId);
+      if (!lobby) {
+        console.log(
+          `❌ LobbyService.getGameResults - Lobby ${lobbyId} non trouvé`
+        );
+        throw new Error("Lobby non trouvé");
+      }
+      console.log(
+        `✅ LobbyService.getGameResults - Lobby trouvé, statut: ${lobby.status}`
+      );
+
+      // Vérifier que la partie est terminée
+      if (lobby.status !== "finished") {
+        console.log(
+          `❌ LobbyService.getGameResults - Partie non terminée, statut: ${lobby.status}, attendu: finished`
+        );
+        throw new Error("La partie n'est pas encore terminée");
+      }
+      console.log(
+        `✅ LobbyService.getGameResults - Partie terminée, statut: ${lobby.status}`
+      );
+
+      // Récupérer tous les joueurs avec leurs scores
+      const players = lobby.players;
+      console.log(
+        `🔍 LobbyService.getGameResults - Nombre de joueurs: ${players.length}`
+      );
+
+      // Créer le classement
+      const rankings = players
+        .map((player) => ({
+          id: player.userId,
+          name: player.user.name,
+          score: player.score || 0,
+          rank: 0, // Sera calculé ci-dessous
+        }))
+        .sort((a, b) => b.score - a.score); // Tri par score décroissant
+
+      // Assigner les rangs
+      rankings.forEach((player, index) => {
+        player.rank = index + 1;
+      });
+
+      console.log(
+        `✅ LobbyService.getGameResults - Classement créé:`,
+        rankings
+      );
+
+      return {
+        rankings,
+        hostId: lobby.hostId,
+      };
+    } catch (error) {
+      console.error("Erreur lors de la récupération des résultats:", error);
+      throw error;
     }
   }
 
