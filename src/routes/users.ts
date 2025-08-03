@@ -26,4 +26,12 @@ export async function usersRoutes(fastify: FastifyInstance) {
     },
     UserController.getUserByTag
   );
+
+  fastify.get(
+    "/me/tag",
+    {
+      preHandler: requireAuth,
+    },
+    UserController.getUserTag
+  );
 }

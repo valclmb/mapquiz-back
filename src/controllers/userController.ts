@@ -30,3 +30,11 @@ export const getUserByTag = asyncHandler(
     return reply.send({ user });
   }
 );
+
+export const getUserTag = asyncHandler(
+  async (request: FastifyRequest, reply: FastifyReply) => {
+    const userId = (request as any).user.id;
+    const result = await UserService.getUserOrCreateTag(userId);
+    return reply.send(result);
+  }
+);
