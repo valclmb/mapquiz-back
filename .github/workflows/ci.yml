@@ -14,7 +14,7 @@ jobs:
       postgres:
         image: postgres:15
         env:
-          POSTGRES_PASSWORD: postgres
+          POSTGRES_PASSWORD: ${{ secrets.TEST_DB_PASSWORD }}
           POSTGRES_DB: test_db
         options: >-
           --health-cmd pg_isready
@@ -39,11 +39,11 @@ jobs:
       - name: Setup environment variables
         run: |
           cp .env.example .env
-          echo "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/test_db" >> .env
-          echo "BETTER_AUTH_SECRET=test-secret-key" >> .env
+          echo "DATABASE_URL=postgresql://postgres:${{ secrets.TEST_DB_PASSWORD }}@localhost:5432/test_db" >> .env
+          echo "BETTER_AUTH_SECRET=${{ secrets.TEST_AUTH_SECRET }}" >> .env
           echo "BETTER_AUTH_URL=http://localhost:3000" >> .env
-          echo "GOOGLE_CLIENT_ID=test-client-id" >> .env
-          echo "GOOGLE_CLIENT_SECRET=test-client-secret" >> .env
+          echo "GOOGLE_CLIENT_ID=${{ secrets.TEST_GOOGLE_CLIENT_ID }}" >> .env
+          echo "GOOGLE_CLIENT_SECRET=${{ secrets.TEST_GOOGLE_CLIENT_SECRET }}" >> .env
           echo "SERVER_URL=http://localhost:3000" >> .env
 
       - name: Generate Prisma client
