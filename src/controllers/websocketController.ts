@@ -3,6 +3,7 @@ import { GameService } from "../services/gameService.js";
 
 import { LobbyService } from "../services/lobbyService.js";
 import { PlayerService } from "../services/playerService.js";
+import { sendToUser } from "../websocket/core/connectionManager.js";
 import { BroadcastManager } from "../websocket/lobby/broadcastManager.js";
 import { LobbyLifecycleManager } from "../websocket/lobby/lobbyLifecycle.js";
 
@@ -198,7 +199,37 @@ export const handleUpdatePlayerProgress = async (
 
 export const handleRestartGame = async (payload: any, userId: string) => {
   const { lobbyId } = payload;
+
+  // Vérifier que l'utilisateur est l'hôte du lobby
+  const lobby = await LobbyService.getLobby(lobbyId);
+  if (!lobby || lobby.hostId !== userId) {
+    throw new Error("Seul l'hôte peut redémarrer la partie");
+  }
+
   const success = await GameService.restartLobby(lobbyId);
+
+  // Broadcast du lobby_update après le restart
+  if (success) {
+    const lobbyInMemory = LobbyLifecycleManager.getLobbyInMemory(lobbyId);
+    if (lobbyInMemory) {
+      await BroadcastManager.broadcastLobbyUpdate(lobbyId, lobbyInMemory);
+
+      // Envoyer un message game_restarted à tous les joueurs
+      const restartMessage = {
+        type: "game_restarted",
+        payload: {
+          lobbyId,
+          message: "Partie remise à zéro, retour au lobby d'attente.",
+        },
+      };
+
+      for (const [playerId] of lobbyInMemory.players) {
+        // Utiliser la fonction sendToUser importée
+        sendToUser(playerId, restartMessage);
+      }
+    }
+  }
+
   return { success };
 };
 

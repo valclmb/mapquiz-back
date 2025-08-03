@@ -287,6 +287,16 @@ export class GameService {
     lobby.status = "waiting";
     lobby.gameState = null;
 
+    // Mettre à jour le statut du lobby en base de données
+    try {
+      await LobbyService.updateLobbyStatus(lobbyId, "waiting");
+    } catch (error) {
+      console.error(
+        `Erreur lors de la mise à jour du statut du lobby ${lobbyId} en base de données:`,
+        error
+      );
+    }
+
     // Réinitialiser tous les joueurs
     const resetPlayers = PlayerService.resetPlayersForNewGame(lobby.players);
     lobby.players = resetPlayers;
@@ -302,6 +312,8 @@ export class GameService {
           [], // validatedCountries
           [] // incorrectCountries
         );
+        // Mettre à jour le statut du joueur
+        await LobbyService.updatePlayerStatus(lobbyId, playerId, "joined");
       } catch (error) {
         console.error(
           `Erreur lors du reset du joueur ${playerId} en DB:`,
