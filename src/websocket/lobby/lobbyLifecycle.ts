@@ -119,10 +119,14 @@ export class LobbyLifecycleManager {
   static getLobbyInMemory(lobbyId: string): any {
     const lobby = activeLobbies.get(lobbyId);
     if (!lobby) {
-      console.log(
-        `Lobby ${lobbyId} non trouvé en mémoire. Lobbies actifs:`,
-        Array.from(activeLobbies.keys())
-      );
+      // Log seulement si on a des lobbies actifs (évite le spam quand tout est vide)
+      const activeLobbyIds = Array.from(activeLobbies.keys());
+      if (activeLobbyIds.length > 0) {
+        console.log(
+          `Lobby ${lobbyId} non trouvé en mémoire. Lobbies actifs:`,
+          activeLobbyIds
+        );
+      }
     }
     return lobby || null;
   }
