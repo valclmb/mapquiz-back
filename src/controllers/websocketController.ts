@@ -135,26 +135,42 @@ export const handleSetPlayerReady = async (payload: any, userId: string) => {
   // Vérifier si tous les joueurs sont prêts pour démarrer automatiquement
   if (ready) {
     try {
-      const allReady = await LobbyService.areAllPlayersReady(
-        lobbyId,
+      console.log(
+        `handleSetPlayerReady - Vérification des joueurs prêts pour le lobby ${lobbyId}`
+      );
+      console.log(
+        `handleSetPlayerReady - Nombre de joueurs: ${lobby.players.size}`
+      );
+      console.log(
+        `handleSetPlayerReady - Joueurs:`,
+        Array.from(lobby.players.entries()).map((entry: any) => ({
+          id: entry[0],
+          status: entry[1].status,
+        }))
+      );
+
+      const allReady = PlayerService.areAllPlayersReady(
+        lobby.players,
         lobby.hostId
       );
+      console.log(
+        `handleSetPlayerReady - Tous les joueurs sont prêts: ${allReady}`
+      );
+
       if (allReady) {
         console.log(
           `Démarrage automatique de la partie pour le lobby ${lobbyId}`
         );
         await GameService.startGame(lobbyId);
+      } else {
+        console.log(
+          `handleSetPlayerReady - Pas tous les joueurs sont prêts, pas de démarrage automatique`
+        );
       }
     } catch (error) {
       console.error("Erreur lors de la vérification des joueurs prêts:", error);
     }
   }
-
-  // Broadcast pour informer les autres joueurs APRÈS le retour
-  // Cela sera géré par le messageHandler qui enverra d'abord le success
-  setTimeout(async () => {
-    await BroadcastManager.broadcastLobbyUpdate(lobbyId, lobby);
-  }, 0);
 
   return { success: true };
 };
@@ -254,6 +270,12 @@ export const handleUpdatePlayerStatus = async (
 ) => {
   const { lobbyId, status } = payload;
 
+  // Si le statut est "ready", utiliser handleSetPlayerReady
+  if (status === "ready") {
+    return await handleSetPlayerReady({ lobbyId, ready: true }, userId);
+  }
+
+  // Sinon, logique normale pour les autres statuts
   const lobby = LobbyLifecycleManager.getLobbyInMemory(lobbyId);
   if (!lobby) return { success: false };
 
@@ -267,9 +289,6 @@ export const handleUpdatePlayerStatus = async (
 
   // Sauvegarder le statut en base de données
   await LobbyService.updatePlayerStatus(lobbyId, userId, status);
-
-  // Broadcast pour informer les autres joueurs
-  await BroadcastManager.broadcastLobbyUpdate(lobbyId, lobby);
 
   return { success: true };
 };

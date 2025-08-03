@@ -23,6 +23,8 @@ import {
   sendErrorResponse,
   sendSuccessResponse,
 } from "../core/authentication.js";
+import { BroadcastManager } from "../lobby/broadcastManager.js";
+import { LobbyLifecycleManager } from "../lobby/lobbyLifecycle.js";
 
 // Types pour les handlers
 type MessageHandler = (
@@ -208,6 +210,14 @@ export class WebSocketMessageHandler {
 
       // Envoyer la réponse de succès
       sendSuccessResponse(socket, result, `${type}_success`);
+
+      // Ajout du broadcast après la réponse de succès pour update_player_status
+      if (type === "update_player_status" && payload?.lobbyId) {
+        const lobby = LobbyLifecycleManager.getLobbyInMemory(payload.lobbyId);
+        if (lobby) {
+          await BroadcastManager.broadcastLobbyUpdate(payload.lobbyId, lobby);
+        }
+      }
     } catch (error) {
       console.error(`Erreur lors du traitement du message ${type}:`, error);
       const errorMessage =

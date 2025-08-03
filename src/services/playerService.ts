@@ -109,9 +109,7 @@ export class PlayerService {
     hostId: string
   ): boolean {
     for (const [playerId, player] of players.entries()) {
-      // L'hôte n'a pas besoin d'être "ready" pour démarrer
-      if (playerId === hostId) continue;
-      
+      // Tous les joueurs, y compris l'hôte, doivent être prêts
       if (player.status !== "ready") {
         return false;
       }
