@@ -246,7 +246,7 @@ export class WebSocketMessageHandler {
       const result = await handler(payload, userId!, socket);
 
       // Envoyer la réponse de succès
-      sendSuccessResponse(socket, result, type);
+      sendSuccessResponse(socket, result, `${type}_success`);
     } catch (error) {
       console.error(`Erreur lors du traitement du message ${type}:`, error);
       const errorMessage =
