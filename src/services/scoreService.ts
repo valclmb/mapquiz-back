@@ -46,7 +46,19 @@ export class ScoreService {
     }
 
     const scores = await ScoreModel.getUserScores(userId);
-    return scores;
+
+    // Transformer les données pour le frontend (minimal)
+    return scores
+      .map((item) => ({
+        score: item.score,
+        duration: item.duration || 0,
+        selectedRegions: item.selectedRegions,
+        date: item.createdAt.toLocaleDateString("fr-FR", {
+          day: "2-digit",
+          month: "2-digit",
+        }),
+      }))
+      .reverse(); // Du plus ancien au plus récent pour le graphique
   }
 
   /**
