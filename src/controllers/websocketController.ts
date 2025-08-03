@@ -135,37 +135,13 @@ export const handleSetPlayerReady = async (payload: any, userId: string) => {
   // Vérifier si tous les joueurs sont prêts pour démarrer automatiquement
   if (ready) {
     try {
-      console.log(
-        `handleSetPlayerReady - Vérification des joueurs prêts pour le lobby ${lobbyId}`
-      );
-      console.log(
-        `handleSetPlayerReady - Nombre de joueurs: ${lobby.players.size}`
-      );
-      console.log(
-        `handleSetPlayerReady - Joueurs:`,
-        Array.from(lobby.players.entries()).map((entry: any) => ({
-          id: entry[0],
-          status: entry[1].status,
-        }))
-      );
-
       const allReady = PlayerService.areAllPlayersReady(
         lobby.players,
         lobby.hostId
       );
-      console.log(
-        `handleSetPlayerReady - Tous les joueurs sont prêts: ${allReady}`
-      );
 
       if (allReady) {
-        console.log(
-          `Démarrage automatique de la partie pour le lobby ${lobbyId}`
-        );
         await GameService.startGame(lobbyId);
-      } else {
-        console.log(
-          `handleSetPlayerReady - Pas tous les joueurs sont prêts, pas de démarrage automatique`
-        );
       }
     } catch (error) {
       console.error("Erreur lors de la vérification des joueurs prêts:", error);
@@ -308,7 +284,7 @@ export const handleGetGameState = async (payload: any, userId: string) => {
 
   try {
     // Récupérer l'état du jeu depuis la mémoire
-    let gameState = getGameStateFromMemory(lobbyId, userId);
+    let gameState = await getGameStateFromMemory(lobbyId, userId);
 
     // Si pas en mémoire, essayer de restaurer depuis la DB
     if (!gameState) {
@@ -320,7 +296,7 @@ export const handleGetGameState = async (payload: any, userId: string) => {
       if (lobbyFromDB && lobbyFromDB.status === "playing") {
         // Restaurer le lobby en mémoire
         LobbyLifecycleManager.restoreLobbyFromDatabase(lobbyId, lobbyFromDB);
-        gameState = getGameStateFromMemory(lobbyId, userId);
+        gameState = await getGameStateFromMemory(lobbyId, userId);
         console.log(`Lobby ${lobbyId} restauré depuis la DB`);
       }
     }
@@ -413,7 +389,10 @@ export const handleGetLobbyState = async (payload: any, userId: string) => {
 /**
  * Récupère l'état du jeu depuis la mémoire
  */
-function getGameStateFromMemory(lobbyId: string, userId: string): any {
+async function getGameStateFromMemory(
+  lobbyId: string,
+  userId: string
+): Promise<any> {
   console.log(
     `getGameStateFromMemory - Début pour lobbyId: ${lobbyId}, userId: ${userId}`
   );
@@ -426,26 +405,28 @@ function getGameStateFromMemory(lobbyId: string, userId: string): any {
     return null;
   }
 
-  console.log(`getGameStateFromMemory - Lobby trouvé, statut: ${lobby.status}`);
-
   // Vérifier que l'utilisateur est dans le lobby
   if (!lobby.players.has(userId)) {
-    console.log(
-      `getGameStateFromMemory - Utilisateur ${userId} non trouvé dans le lobby`
-    );
     return null;
   }
 
-  const players = Array.from(lobby.players.entries()).map((entry: any) => {
-    const [id, data] = entry;
+  // Récupérer les données complètes depuis la base de données pour avoir les progressions à jour
+  const lobbyFromDB = await LobbyService.getLobby(lobbyId);
+  if (!lobbyFromDB) {
+    return null;
+  }
+
+  // Fusionner les données en mémoire avec celles de la base de données
+  const players = lobbyFromDB.players.map((player: any) => {
+    const memoryPlayer = lobby.players.get(player.userId);
     return {
-      id,
-      name: data.name,
-      status: data.status,
-      score: data.score,
-      progress: data.progress,
-      validatedCountries: data.validatedCountries,
-      incorrectCountries: data.incorrectCountries,
+      id: player.userId,
+      name: player.user.name,
+      status: memoryPlayer ? memoryPlayer.status : player.status,
+      score: player.score || 0,
+      progress: player.progress || 0,
+      validatedCountries: player.validatedCountries || [],
+      incorrectCountries: player.incorrectCountries || [],
     };
   });
 

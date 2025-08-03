@@ -33,14 +33,11 @@ export class BroadcastManager {
         id: player.user.id,
         name: player.user.name,
         status: memoryPlayer ? memoryPlayer.status : player.status,
-        score: memoryPlayer ? memoryPlayer.score : player.score || 0,
-        progress: memoryPlayer ? memoryPlayer.progress : player.progress || 0,
-        validatedCountries: memoryPlayer
-          ? memoryPlayer.validatedCountries
-          : player.validatedCountries || [],
-        incorrectCountries: memoryPlayer
-          ? memoryPlayer.incorrectCountries
-          : player.incorrectCountries || [],
+        // Priorité aux données de la base de données pour la progression
+        score: player.score || 0,
+        progress: player.progress || 0,
+        validatedCountries: player.validatedCountries || [],
+        incorrectCountries: player.incorrectCountries || [],
       };
     });
 

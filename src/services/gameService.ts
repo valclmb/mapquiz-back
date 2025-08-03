@@ -1,7 +1,7 @@
-import { LobbyService } from "./lobbyService.js";
-import { PlayerService, PlayerProgress } from "./playerService.js";
-import { LobbyLifecycleManager } from "../websocket/lobby/lobbyLifecycle.js";
 import { BroadcastManager } from "../websocket/lobby/broadcastManager.js";
+import { LobbyLifecycleManager } from "../websocket/lobby/lobbyLifecycle.js";
+import { LobbyService } from "./lobbyService.js";
+import { PlayerService } from "./playerService.js";
 
 /**
  * Service pour la gestion du jeu
@@ -53,7 +53,10 @@ export class GameService {
         await LobbyService.updatePlayerStatus(lobbyId, playerId, "playing");
       }
     } catch (error) {
-      console.error(`Erreur lors de la mise à jour du statut "playing":`, error);
+      console.error(
+        `Erreur lors de la mise à jour du statut "playing":`,
+        error
+      );
     }
 
     // Sauvegarder l'état du jeu en base de données
@@ -167,7 +170,7 @@ export class GameService {
       );
     } catch (error) {
       console.error(
-        `❌ Erreur lors de la sauvegarde de la progression en DB pour ${playerId}:`,
+        `Erreur lors de la sauvegarde de la progression en DB pour ${playerId}:`,
         error
       );
     }
@@ -202,9 +205,6 @@ export class GameService {
     const playerData = lobby.players.get(playerId);
     if (playerData) {
       lobby.players.set(playerId, { ...playerData, status: "finished" });
-      console.log(
-        `GameService.checkGameCompletion - Joueur ${playerId} marqué comme finished`
-      );
     }
 
     // Vérifier si tous les joueurs ont terminé
@@ -216,7 +216,6 @@ export class GameService {
     }
 
     if (allFinished) {
-      console.log(`GameService.checkGameCompletion - Fin de jeu déclenchée !`);
       this.endGame(lobbyId).catch((error) => {
         console.error("Erreur lors de la fin de jeu:", error);
       });
@@ -246,7 +245,6 @@ export class GameService {
       );
     }
 
-    console.log("GameService.endGame - Fin de jeu, rankings:", rankings);
     BroadcastManager.broadcastGameEnd(lobbyId);
     // Diffuser un lobby_update avec le status finished pour synchroniser le frontend
     await BroadcastManager.broadcastLobbyUpdate(lobbyId, lobby);
@@ -256,8 +254,6 @@ export class GameService {
    * Redémarre un lobby
    */
   static async restartLobby(lobbyId: string): Promise<boolean> {
-    console.log(`GameService.restartLobby - Redémarrage du lobby ${lobbyId}`);
-
     const lobby = LobbyLifecycleManager.getLobbyInMemory(lobbyId);
     if (!lobby) {
       console.log(`Lobby ${lobbyId} non trouvé en mémoire`);
@@ -291,7 +287,6 @@ export class GameService {
       }
     }
 
-    console.log(`Lobby ${lobbyId} redémarré avec succès`);
     return true;
   }
-} 
+}
