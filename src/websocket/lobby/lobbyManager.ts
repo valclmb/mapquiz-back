@@ -1,4 +1,5 @@
 import * as LobbyModel from "../../models/lobbyModel.js";
+import * as UserModel from "../../models/userModel.js";
 import { BroadcastManager } from "./broadcastManager.js";
 import { GameManager } from "./gameManager.js";
 import { LobbyLifecycleManager } from "./lobbyLifecycle.js";
@@ -9,20 +10,62 @@ import { PlayerManager } from "./playerManager.js";
  */
 export class LobbyManager {
   /**
-   * Crée un nouveau lobby
+   * Crée un nouveau lobby (en base de données et en mémoire)
    */
-  static createLobby(
-    lobbyId: string,
+  static async createLobby(
     hostId: string,
-    hostName: string,
-    settings: any
-  ): { lobbyId: string; hostId: string; settings: any } {
-    return LobbyLifecycleManager.createLobby(
-      lobbyId,
-      hostId,
-      hostName,
-      settings
-    );
+    name: string,
+    settings: any = {}
+  ): Promise<{
+    success: boolean;
+    lobbyId: string;
+    hostId: string;
+    settings: any;
+    lobby?: any;
+    players?: any[];
+  }> {
+    try {
+      // Vérifier que l'utilisateur existe
+      const user = await UserModel.findUserById(hostId);
+      if (!user) {
+        throw new Error("Utilisateur non trouvé");
+      }
+
+      // Créer le lobby en base de données
+      const lobby = await LobbyModel.createLobby(
+        hostId,
+        name || `Lobby de ${user.name || hostId}`,
+        settings
+      );
+      console.log(`Lobby créé en base de données: ${lobby.id}`);
+
+      // Créer le lobby en mémoire pour la gestion en temps réel
+      const memoryResult = LobbyLifecycleManager.createLobby(
+        lobby.id,
+        hostId,
+        user.name || "User",
+        settings
+      );
+      console.log(`Lobby créé en mémoire: ${lobby.id}`);
+
+      return {
+        success: true,
+        lobbyId: lobby.id,
+        hostId: hostId,
+        settings: settings,
+        lobby: lobby,
+        players: [
+          {
+            id: hostId,
+            name: user.name || "User",
+            status: "joined", // L'hôte commence comme "rejoint", pas "prêt"
+          },
+        ],
+      };
+    } catch (error) {
+      console.error("Erreur lors de la création du lobby:", error);
+      return { success: false, lobbyId: "", hostId: "", settings: {} };
+    }
   }
 
   /**

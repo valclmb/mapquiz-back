@@ -4,7 +4,7 @@ import { requireAuth } from "../middleware/auth.js";
 
 export async function scoresRoutes(fastify: FastifyInstance) {
   fastify.post(
-    "/save",
+    "/",
     {
       preHandler: requireAuth,
     },

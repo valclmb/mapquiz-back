@@ -46,9 +46,7 @@ export class ScoreService {
     }
 
     const scores = await ScoreModel.getUserScores(userId);
-    return {
-      scores,
-    };
+    return scores;
   }
 
   /**
