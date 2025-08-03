@@ -1,5 +1,6 @@
 import * as LobbyModel from "../models/lobbyModel.js";
 import * as UserModel from "../models/userModel.js";
+import { sendToUser } from "../websocket/core/connectionManager.js";
 
 /**
  * Service principal pour la gestion des lobbies
@@ -209,5 +210,44 @@ export class LobbyService {
       console.error("Erreur lors de la suppression du lobby:", error);
       return false;
     }
+  }
+
+  /**
+   * Invite un ami dans un lobby
+   */
+  static async inviteToLobby(
+    hostId: string,
+    lobbyId: string,
+    friendId: string
+  ) {
+    // Vérifier que l'utilisateur est bien l'hôte du lobby
+    const lobby = await LobbyModel.getLobby(lobbyId);
+    if (!lobby || lobby.hostId !== hostId) {
+      throw new Error("Non autorisé à inviter des joueurs dans ce lobby");
+    }
+
+    // Vérifier si le joueur est déjà dans le lobby
+    const existingPlayer = await LobbyModel.getPlayerInLobby(lobbyId, friendId);
+
+    // Si le joueur est déjà dans le lobby, ne pas renvoyer d'invitation
+    if (existingPlayer) {
+      return { success: true, message: "Joueur déjà dans le lobby" };
+    }
+
+    // Ajouter l'utilisateur à la liste des joueurs autorisés
+    await LobbyModel.addAuthorizedPlayer(lobbyId, friendId);
+
+    // Envoyer une notification à l'ami
+    sendToUser(friendId, {
+      type: "lobby_invitation",
+      payload: {
+        lobbyId,
+        hostId,
+        hostName: lobby.host.name,
+        lobbyName: lobby.name,
+      },
+    });
+
+    return { success: true, message: "Invitation envoyée" };
   }
 }

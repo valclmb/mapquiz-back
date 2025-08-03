@@ -1,5 +1,5 @@
 import * as LobbyModel from "../../models/lobbyModel.js";
-import { PlayerManager } from "./playerManager.js";
+import { PlayerService } from "../../services/playerService.js";
 
 // Map des lobbies actifs : lobbyId -> {players, gameState}
 const activeLobbies = new Map();
@@ -19,7 +19,7 @@ export class LobbyLifecycleManager {
     delayMs: number = 3 * 60 * 1000
   ): void {
     if (lobbyDeletionTimers.has(lobbyId)) return;
-    
+
     const timer = setTimeout(async () => {
       try {
         await LobbyModel.deleteLobby(lobbyId);
@@ -35,7 +35,7 @@ export class LobbyLifecycleManager {
       }
       lobbyDeletionTimers.delete(lobbyId);
     }, delayMs);
-    
+
     lobbyDeletionTimers.set(lobbyId, timer);
   }
 
@@ -60,10 +60,12 @@ export class LobbyLifecycleManager {
     hostName: string,
     settings: any
   ): { lobbyId: string; hostId: string; settings: any } {
-    console.log(`Création du lobby ${lobbyId} en mémoire avec l'hôte ${hostId}`);
-    
+    console.log(
+      `Création du lobby ${lobbyId} en mémoire avec l'hôte ${hostId}`
+    );
+
     activeLobbies.set(lobbyId, {
-      players: new Map([[hostId, PlayerManager.createPlayer(hostName)]]),
+      players: new Map([[hostId, PlayerService.createPlayer(hostName)]]),
       hostId: hostId,
       settings,
       status: "waiting",
@@ -131,4 +133,4 @@ export class LobbyLifecycleManager {
   static getAllActiveLobbies(): Map<string, any> {
     return activeLobbies;
   }
-} 
+}

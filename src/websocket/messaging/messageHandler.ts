@@ -1,26 +1,28 @@
 import { WebSocket } from "@fastify/websocket";
 import {
+  handleCreateLobby,
+  handleGetGameState,
+  handleGetLobbyState,
+  handleInviteToLobby,
+  handleJoinLobby,
+  handleLeaveGame,
+  handleLeaveLobby,
+  handleRemovePlayer,
   handleRespondFriendRequest,
+  handleRestartGame,
   handleSendFriendRequest,
+  handleSetPlayerReady,
+  handleStartGame,
+  handleUpdateGameProgress,
+  handleUpdateLobbySettings,
+  handleUpdatePlayerProgress,
+  handleUpdatePlayerStatus,
 } from "../../controllers/websocketController.js";
-import { getLobby } from "../../models/lobbyModel.js";
-import { LobbyPlayerService } from "../../services/lobbyPlayerService.js";
 import { WS_MESSAGE_TYPES } from "../../types/websocket.js";
 import {
   sendErrorResponse,
   sendSuccessResponse,
 } from "../core/authentication.js";
-import {
-  addPlayerToLobby,
-  getGameState,
-  LobbyManager,
-  removePlayerFromLobby,
-  restartLobby,
-  startGame,
-  updatePlayerProgress,
-  updatePlayerScore,
-  updatePlayerStatus as updatePlayerStatusInLobby,
-} from "../lobby/lobbyManager.js";
 
 // Types pour les handlers
 type MessageHandler = (
@@ -50,62 +52,49 @@ const messageHandlers = new Map<string, MessageHandler>([
   [
     WS_MESSAGE_TYPES.CREATE_LOBBY,
     async (payload, userId) => {
-      const { name, settings } = payload;
-      return await LobbyManager.createLobby(userId, name, settings);
+      return await handleCreateLobby(payload, userId);
     },
   ],
 
   [
     WS_MESSAGE_TYPES.INVITE_TO_LOBBY,
     async (payload, userId) => {
-      const { lobbyId, friendId } = payload;
-      return await LobbyPlayerService.inviteToLobby(userId, lobbyId, friendId);
+      return await handleInviteToLobby(payload, userId);
     },
   ],
 
   [
     WS_MESSAGE_TYPES.JOIN_LOBBY,
     async (payload, userId) => {
-      const { lobbyId } = payload;
-      const success = await addPlayerToLobby(lobbyId, userId, "User");
-      return { success };
+      return await handleJoinLobby(payload, userId);
     },
   ],
 
   [
     WS_MESSAGE_TYPES.LEAVE_LOBBY,
     async (payload, userId) => {
-      const { lobbyId } = payload;
-      const success = await removePlayerFromLobby(lobbyId, userId);
-      return { success };
+      return await handleLeaveLobby(payload, userId);
     },
   ],
 
   [
     WS_MESSAGE_TYPES.UPDATE_LOBBY_SETTINGS,
     async (payload, userId) => {
-      const { lobbyId, settings } = payload;
-      // Logique de mise à jour des paramètres du lobby
-      return { success: true };
+      return await handleUpdateLobbySettings(payload, userId);
     },
   ],
 
   [
     WS_MESSAGE_TYPES.SET_PLAYER_READY,
     async (payload, userId) => {
-      const { lobbyId, ready } = payload;
-      const status = ready ? "ready" : "joined";
-      const success = await updatePlayerStatusInLobby(lobbyId, userId, status);
-      return { success };
+      return await handleSetPlayerReady(payload, userId);
     },
   ],
 
   [
     WS_MESSAGE_TYPES.START_GAME,
     async (payload, userId) => {
-      const { lobbyId } = payload;
-      const success = await startGame(lobbyId);
-      return { success };
+      return await handleStartGame(payload, userId);
     },
   ],
 
@@ -113,93 +102,56 @@ const messageHandlers = new Map<string, MessageHandler>([
   [
     WS_MESSAGE_TYPES.UPDATE_GAME_PROGRESS,
     async (payload, userId) => {
-      const { lobbyId, score, progress, answerTime, isConsecutiveCorrect } =
-        payload;
-      const success = await updatePlayerScore(
-        lobbyId,
-        userId,
-        score,
-        progress,
-        answerTime,
-        isConsecutiveCorrect
-      );
-      return { success };
+      return await handleUpdateGameProgress(payload, userId);
     },
   ],
 
   [
     WS_MESSAGE_TYPES.UPDATE_PLAYER_PROGRESS,
     async (payload, userId) => {
-      const {
-        lobbyId,
-        validatedCountries,
-        incorrectCountries,
-        score,
-        totalQuestions,
-      } = payload;
-      const success = await updatePlayerProgress(
-        lobbyId,
-        userId,
-        validatedCountries,
-        incorrectCountries,
-        score,
-        totalQuestions
-      );
-      return { success };
+      return await handleUpdatePlayerProgress(payload, userId);
     },
   ],
 
   [
     WS_MESSAGE_TYPES.GET_GAME_STATE,
     async (payload, userId) => {
-      const { lobbyId } = payload;
-      const gameState = getGameState(lobbyId, userId);
-      return { success: true, gameState };
+      return await handleGetGameState(payload, userId);
     },
   ],
 
   [
     WS_MESSAGE_TYPES.GET_LOBBY_STATE,
     async (payload, userId) => {
-      const { lobbyId } = payload;
-      const lobby = await getLobby(lobbyId);
-      return { success: true, lobby };
+      return await handleGetLobbyState(payload, userId);
     },
   ],
 
   [
     WS_MESSAGE_TYPES.RESTART_GAME,
     async (payload, userId) => {
-      const { lobbyId } = payload;
-      const success = await restartLobby(lobbyId);
-      return { success };
+      return await handleRestartGame(payload, userId);
     },
   ],
 
   [
     WS_MESSAGE_TYPES.LEAVE_GAME,
     async (payload, userId) => {
-      const { lobbyId } = payload;
-      const success = await removePlayerFromLobby(lobbyId, userId);
-      return { success };
+      return await handleLeaveGame(payload, userId);
     },
   ],
 
   [
     WS_MESSAGE_TYPES.REMOVE_PLAYER,
     async (payload, userId) => {
-      const { lobbyId, playerId } = payload;
-      const success = await removePlayerFromLobby(lobbyId, playerId);
-      return { success };
+      return await handleRemovePlayer(payload, userId);
     },
   ],
 
   [
     "update_player_status",
     async (payload, userId) => {
-      const { lobbyId, status } = payload;
-      const success = await updatePlayerStatusInLobby(lobbyId, userId, status);
-      return { success };
+      return await handleUpdatePlayerStatus(payload, userId);
     },
   ],
 ]);

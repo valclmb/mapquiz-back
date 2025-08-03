@@ -1,6 +1,6 @@
-import { sendToUser } from "../core/connectionManager.js";
-import { getLobbyInMemory } from "./lobbyManager.js";
 import { prisma } from "../../lib/database.js";
+import { sendToUser } from "../core/connectionManager.js";
+import { LobbyLifecycleManager } from "./lobbyLifecycle.js";
 
 /**
  * Gestionnaire de diffusion des messages WebSocket
@@ -126,7 +126,7 @@ export class BroadcastManager {
       },
     };
 
-    const lobby = getLobbyInMemory(lobbyId);
+    const lobby = LobbyLifecycleManager.getLobbyInMemory(lobbyId);
     if (lobby) {
       for (const [playerId] of lobby.players) {
         sendToUser(playerId, message);
@@ -186,7 +186,7 @@ export class BroadcastManager {
       },
     };
 
-    const lobby = getLobbyInMemory(lobbyId);
+    const lobby = LobbyLifecycleManager.getLobbyInMemory(lobbyId);
     if (lobby) {
       for (const [remainingPlayerId] of lobby.players) {
         if (remainingPlayerId !== playerId) {

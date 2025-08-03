@@ -1,29 +1,40 @@
-import { LobbyService } from "../../services/lobbyService.js";
-import { BroadcastManager } from "./broadcastManager.js";
-import { GameStateManager } from "./gameStateManager.js";
-import { LobbyLifecycleManager } from "./lobbyLifecycle.js";
-import { PlayerManager } from "./playerManager.js";
+import { LobbyService } from "./lobbyService.js";
+import { PlayerService, PlayerProgress } from "./playerService.js";
+import { LobbyLifecycleManager } from "../websocket/lobby/lobbyLifecycle.js";
+import { BroadcastManager } from "../websocket/lobby/broadcastManager.js";
 
 /**
- * Gestionnaire de la logique de jeu
+ * Service pour la gestion du jeu
  */
-export class GameManager {
+export class GameService {
   /**
    * Démarre une partie
    */
   static async startGame(lobbyId: string): Promise<boolean> {
-    console.log("🚀 GameManager.startGame - DÉBUT pour le lobby:", lobbyId);
-
     const lobby = LobbyLifecycleManager.getLobbyInMemory(lobbyId);
     if (!lobby) {
-      console.log(
-        "❌ GameManager.startGame - Lobby non trouvé en mémoire:",
-        lobbyId
-      );
+      console.log(`Lobby ${lobbyId} non trouvé en mémoire`);
       return false;
     }
 
-    console.log("✅ GameManager.startGame - Lobby trouvé, début du traitement");
+    console.log(`Démarrage de la partie pour le lobby ${lobbyId}`);
+
+    // Mettre à jour le statut du lobby
+    lobby.status = "playing";
+
+    // Initialiser l'état du jeu
+    lobby.gameState = {
+      startTime: Date.now(),
+      settings: lobby.settings,
+    };
+
+    // Mettre à jour le statut de tous les joueurs
+    for (const [playerId, playerData] of lobby.players) {
+      lobby.players.set(
+        playerId,
+        PlayerService.updatePlayerStatus(playerData, "playing")
+      );
+    }
 
     // Mettre à jour le statut du lobby en base de données
     try {
@@ -36,48 +47,13 @@ export class GameManager {
       );
     }
 
-    lobby.status = "playing";
-    lobby.gameState = {
-      startTime: Date.now(),
-      settings: {
-        selectedRegions: lobby.settings.selectedRegions || [],
-      },
-    };
-
-    console.log("GameManager.startGame - gameState créé:", {
-      startTime: lobby.gameState.startTime,
-      settings: lobby.gameState.settings,
-    });
-
-    // Réinitialiser tous les joueurs pour la nouvelle partie
-    lobby.players = PlayerManager.resetPlayersForNewGame(lobby.players);
-
-    console.log(
-      `GameManager.startGame - Joueurs après reset:`,
-      Array.from(lobby.players.keys())
-    );
-
-    // Mettre à jour le statut "playing" de tous les joueurs
+    // Mettre à jour le statut de tous les joueurs en base de données
     try {
-      for (const [playerId, playerData] of lobby.players) {
-        // Mettre à jour en mémoire
-        lobby.players.set(
-          playerId,
-          PlayerManager.updatePlayerStatus(playerData, "playing")
-        );
-
-        // Mettre à jour en base de données
+      for (const [playerId] of lobby.players) {
         await LobbyService.updatePlayerStatus(lobbyId, playerId, "playing");
       }
-
-      console.log(
-        `Statut "playing" mis à jour en mémoire et en DB pour tous les joueurs du lobby ${lobbyId}`
-      );
     } catch (error) {
-      console.error(
-        `Erreur lors de la mise à jour du statut "playing":`,
-        error
-      );
+      console.error(`Erreur lors de la mise à jour du statut "playing":`, error);
     }
 
     // Sauvegarder l'état du jeu en base de données
@@ -93,12 +69,10 @@ export class GameManager {
       );
     }
 
-    console.log(`GameManager.startGame - Broadcast du début de partie`);
+    // Diffuser le début de la partie
     BroadcastManager.broadcastGameStart(lobbyId, lobby);
 
-    // Diffuser aussi la mise à jour du lobby avec le nouveau statut "playing"
-    console.log(`GameManager.startGame - Broadcast de la mise à jour du lobby`);
-    await BroadcastManager.broadcastLobbyUpdate(lobbyId, lobby);
+    console.log(`Partie démarrée avec succès pour le lobby ${lobbyId}`);
     return true;
   }
 
@@ -117,7 +91,7 @@ export class GameManager {
     if (!lobby || !lobby.players.has(playerId)) return false;
 
     const playerData = lobby.players.get(playerId);
-    const updatedPlayer = PlayerManager.updatePlayerScore(
+    const updatedPlayer = PlayerService.updatePlayerScore(
       playerData,
       score,
       progress,
@@ -171,7 +145,7 @@ export class GameManager {
     if (!lobby || !lobby.players.has(playerId)) return false;
 
     const playerData = lobby.players.get(playerId);
-    const updatedPlayer = PlayerManager.updatePlayerProgress(
+    const updatedPlayer = PlayerService.updatePlayerProgress(
       playerData,
       validatedCountries,
       incorrectCountries,
@@ -201,7 +175,7 @@ export class GameManager {
     // Vérifier si le joueur a terminé la partie
     if (updatedPlayer.progress >= 100) {
       console.log(
-        `GameManager.updatePlayerProgress - Joueur ${playerId} a terminé avec ${updatedPlayer.progress}% de progression`
+        `GameService.updatePlayerProgress - Joueur ${playerId} a terminé avec ${updatedPlayer.progress}% de progression`
       );
       this.checkGameCompletion(lobbyId, playerId);
     }
@@ -215,23 +189,21 @@ export class GameManager {
    */
   private static checkGameCompletion(lobbyId: string, playerId: string): void {
     console.log(
-      `GameManager.checkGameCompletion - Début pour lobbyId: ${lobbyId}, playerId: ${playerId}`
+      `GameService.checkGameCompletion - Début pour lobbyId: ${lobbyId}, playerId: ${playerId}`
     );
 
     const lobby = LobbyLifecycleManager.getLobbyInMemory(lobbyId);
     if (!lobby) {
-      console.log(
-        `GameManager.checkGameCompletion - Lobby ${lobbyId} non trouvé`
-      );
+      console.log(`Lobby ${lobbyId} non trouvé en mémoire`);
       return;
     }
 
-    // Marquer le joueur comme ayant terminé
+    // Marquer le joueur comme terminé
     const playerData = lobby.players.get(playerId);
     if (playerData) {
       lobby.players.set(playerId, { ...playerData, status: "finished" });
       console.log(
-        `GameManager.checkGameCompletion - Joueur ${playerId} marqué comme finished`
+        `GameService.checkGameCompletion - Joueur ${playerId} marqué comme finished`
       );
     }
 
@@ -244,7 +216,7 @@ export class GameManager {
     }
 
     if (allFinished) {
-      console.log(`GameManager.checkGameCompletion - Fin de jeu déclenchée !`);
+      console.log(`GameService.checkGameCompletion - Fin de jeu déclenchée !`);
       this.endGame(lobbyId).catch((error) => {
         console.error("Erreur lors de la fin de jeu:", error);
       });
@@ -259,7 +231,7 @@ export class GameManager {
     if (!lobby) return;
 
     lobby.status = "finished";
-    const rankings = GameStateManager.calculateRankings(lobby.players);
+    const rankings = PlayerService.calculateRankings(lobby.players);
 
     // Mettre à jour le statut du lobby en base de données
     try {
@@ -274,7 +246,7 @@ export class GameManager {
       );
     }
 
-    console.log("GameManager.endGame - Fin de jeu, rankings:", rankings);
+    console.log("GameService.endGame - Fin de jeu, rankings:", rankings);
     BroadcastManager.broadcastGameEnd(lobbyId);
     // Diffuser un lobby_update avec le status finished pour synchroniser le frontend
     await BroadcastManager.broadcastLobbyUpdate(lobbyId, lobby);
@@ -284,7 +256,7 @@ export class GameManager {
    * Redémarre un lobby
    */
   static async restartLobby(lobbyId: string): Promise<boolean> {
-    console.log(`GameManager.restartLobby - Redémarrage du lobby ${lobbyId}`);
+    console.log(`GameService.restartLobby - Redémarrage du lobby ${lobbyId}`);
 
     const lobby = LobbyLifecycleManager.getLobbyInMemory(lobbyId);
     if (!lobby) {
@@ -297,18 +269,11 @@ export class GameManager {
     lobby.gameState = null;
 
     // Réinitialiser tous les joueurs
-    for (const [playerId, playerData] of lobby.players) {
-      lobby.players.set(playerId, {
-        ...playerData,
-        status: "joined",
-        score: 0,
-        progress: 0,
-        validatedCountries: [],
-        incorrectCountries: [],
-        completionTime: null,
-      });
+    const resetPlayers = PlayerService.resetPlayersForNewGame(lobby.players);
+    lobby.players = resetPlayers;
 
-      // Remettre à zéro en base de données aussi
+    // Remettre à zéro en base de données aussi
+    for (const [playerId] of lobby.players) {
       try {
         await LobbyService.updatePlayerScore(
           lobbyId,
@@ -329,4 +294,4 @@ export class GameManager {
     console.log(`Lobby ${lobbyId} redémarré avec succès`);
     return true;
   }
-}
+} 

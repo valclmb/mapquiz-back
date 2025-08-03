@@ -1,10 +1,8 @@
 import { WebSocket } from "@fastify/websocket";
-import { APP_CONFIG } from "../../lib/config.js";
 import * as LobbyModel from "../../models/lobbyModel.js";
-import * as UserModel from "../../models/userModel.js";
 import { FriendService } from "../../services/friendService.js";
 import { BroadcastManager } from "../lobby/broadcastManager.js";
-import * as LobbyManager from "../lobby/lobbyManager.js";
+import { LobbyLifecycleManager } from "../lobby/lobbyLifecycle.js";
 import { sendSuccessResponse } from "./authentication.js";
 import { addConnection, removeConnection } from "./connectionManager.js";
 
@@ -74,12 +72,25 @@ export class WebSocketConnectionHandler {
       for (const lobby of userLobbies) {
         if (lobby.status === "waiting") {
           // Restaurer l'utilisateur dans le lobby
-          LobbyManager.addPlayerToLobby(lobby.id, userId, "User");
-          
-          // Diffuser la mise à jour
-          const lobbyInMemory = LobbyManager.getLobbyInMemory(lobby.id);
+          const lobbyInMemory = LobbyLifecycleManager.getLobbyInMemory(
+            lobby.id
+          );
           if (lobbyInMemory) {
-            await BroadcastManager.broadcastLobbyUpdate(lobby.id, lobbyInMemory);
+            // Ajouter le joueur au lobby en mémoire
+            lobbyInMemory.players.set(userId, {
+              status: "joined",
+              score: 0,
+              progress: 0,
+              name: "User",
+              validatedCountries: [],
+              incorrectCountries: [],
+            });
+
+            // Diffuser la mise à jour
+            await BroadcastManager.broadcastLobbyUpdate(
+              lobby.id,
+              lobbyInMemory
+            );
           }
         }
       }
@@ -93,7 +104,10 @@ export class WebSocketConnectionHandler {
   /**
    * Configure les gestionnaires d'événements de fermeture
    */
-  private static setupConnectionEventHandlers(socket: WebSocket, userId: string): void {
+  private static setupConnectionEventHandlers(
+    socket: WebSocket,
+    userId: string
+  ): void {
     socket.on("close", async () => {
       if (this.recentlyDisconnectedUsers.has(userId)) {
         return;
@@ -133,11 +147,16 @@ export class WebSocketConnectionHandler {
         if (lobby.status === "waiting") {
           // Marquer le joueur comme déconnecté
           await LobbyModel.updatePlayerStatus(lobby.id, userId, "disconnected");
-          
+
           // Diffuser la mise à jour
-          const lobbyInMemory = LobbyManager.getLobbyInMemory(lobby.id);
+          const lobbyInMemory = LobbyLifecycleManager.getLobbyInMemory(
+            lobby.id
+          );
           if (lobbyInMemory) {
-            await BroadcastManager.broadcastLobbyUpdate(lobby.id, lobbyInMemory);
+            await BroadcastManager.broadcastLobbyUpdate(
+              lobby.id,
+              lobbyInMemory
+            );
           }
         }
       }
