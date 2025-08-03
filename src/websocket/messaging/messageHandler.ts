@@ -4,6 +4,7 @@ import {
   handleSendFriendRequest,
 } from "../../controllers/websocketController.js";
 import { getLobby } from "../../models/lobbyModel.js";
+import { LobbyPlayerService } from "../../services/lobbyPlayerService.js";
 import { WS_MESSAGE_TYPES } from "../../types/websocket.js";
 import {
   sendErrorResponse,
@@ -51,6 +52,14 @@ const messageHandlers = new Map<string, MessageHandler>([
     async (payload, userId) => {
       const { name, settings } = payload;
       return await LobbyManager.createLobby(userId, name, settings);
+    },
+  ],
+
+  [
+    WS_MESSAGE_TYPES.INVITE_TO_LOBBY,
+    async (payload, userId) => {
+      const { lobbyId, friendId } = payload;
+      return await LobbyPlayerService.inviteToLobby(userId, lobbyId, friendId);
     },
   ],
 

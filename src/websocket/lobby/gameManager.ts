@@ -1,4 +1,4 @@
-import * as LobbyModel from "../../models/lobbyModel.js";
+import { LobbyService } from "../../services/lobbyService.js";
 import { BroadcastManager } from "./broadcastManager.js";
 import { GameStateManager } from "./gameStateManager.js";
 import { LobbyLifecycleManager } from "./lobbyLifecycle.js";
@@ -27,7 +27,7 @@ export class GameManager {
 
     // Mettre à jour le statut du lobby en base de données
     try {
-      await LobbyModel.updateLobbyStatus(lobbyId, "playing");
+      await LobbyService.startGame(lobbyId);
       console.log(`Statut du lobby ${lobbyId} mis à jour en base de données`);
     } catch (error) {
       console.error(
@@ -67,19 +67,22 @@ export class GameManager {
         );
 
         // Mettre à jour en base de données
-        await LobbyModel.updatePlayerStatus(lobbyId, playerId, "playing");
+        await LobbyService.updatePlayerStatus(lobbyId, playerId, "playing");
       }
 
       console.log(
         `Statut "playing" mis à jour en mémoire et en DB pour tous les joueurs du lobby ${lobbyId}`
       );
     } catch (error) {
-      console.error(`Erreur lors de la mise à jour du statut "playing":`, error);
+      console.error(
+        `Erreur lors de la mise à jour du statut "playing":`,
+        error
+      );
     }
 
     // Sauvegarder l'état du jeu en base de données
     try {
-      await LobbyModel.saveGameState(lobbyId, lobby.gameState);
+      await LobbyService.saveGameState(lobbyId, lobby.gameState);
       console.log(
         `État du jeu sauvegardé en base de données pour le lobby ${lobbyId}`
       );
@@ -126,7 +129,7 @@ export class GameManager {
 
     // Sauvegarder en base de données
     try {
-      await LobbyModel.updatePlayerGameData(
+      await LobbyService.updatePlayerScore(
         lobbyId,
         playerId,
         updatedPlayer.score,
@@ -180,13 +183,13 @@ export class GameManager {
 
     // Sauvegarder en base de données
     try {
-      await LobbyModel.updatePlayerGameData(
+      await LobbyService.updatePlayerProgress(
         lobbyId,
         playerId,
-        updatedPlayer.score,
-        updatedPlayer.progress,
         updatedPlayer.validatedCountries,
-        updatedPlayer.incorrectCountries
+        updatedPlayer.incorrectCountries,
+        updatedPlayer.score,
+        totalQuestions
       );
     } catch (error) {
       console.error(
@@ -260,7 +263,7 @@ export class GameManager {
 
     // Mettre à jour le statut du lobby en base de données
     try {
-      await LobbyModel.updateLobbyStatus(lobbyId, "finished");
+      // TODO: Ajouter une méthode updateLobbyStatus dans LobbyService
       console.log(
         `Statut du lobby ${lobbyId} mis à jour en base de données vers 'finished'`
       );
@@ -307,7 +310,7 @@ export class GameManager {
 
       // Remettre à zéro en base de données aussi
       try {
-        await LobbyModel.updatePlayerGameData(
+        await LobbyService.updatePlayerScore(
           lobbyId,
           playerId,
           0, // score
@@ -316,11 +319,14 @@ export class GameManager {
           [] // incorrectCountries
         );
       } catch (error) {
-        console.error(`Erreur lors du reset du joueur ${playerId} en DB:`, error);
+        console.error(
+          `Erreur lors du reset du joueur ${playerId} en DB:`,
+          error
+        );
       }
     }
 
     console.log(`Lobby ${lobbyId} redémarré avec succès`);
     return true;
   }
-} 
+}

@@ -191,3 +191,39 @@ export const findUserLobbies = async (userId: string) => {
     },
   });
 };
+
+// Récupérer un joueur dans un lobby
+export const getPlayerInLobby = async (lobbyId: string, userId: string) => {
+  return await prisma.lobbyPlayer.findUnique({
+    where: {
+      lobbyId_userId: {
+        lobbyId,
+        userId,
+      },
+    },
+    include: {
+      user: true,
+    },
+  });
+};
+
+// Ajouter un joueur autorisé au lobby
+export const addAuthorizedPlayer = async (lobbyId: string, userId: string) => {
+  const lobby = await prisma.gameLobby.findUnique({
+    where: { id: lobbyId },
+  });
+
+  if (!lobby) {
+    throw new Error("Lobby non trouvé");
+  }
+
+  const authorizedPlayers = lobby.authorizedPlayers || [];
+  if (!authorizedPlayers.includes(userId)) {
+    authorizedPlayers.push(userId);
+  }
+
+  return await prisma.gameLobby.update({
+    where: { id: lobbyId },
+    data: { authorizedPlayers },
+  });
+};
