@@ -177,10 +177,15 @@ export class GameService {
 
     // Vérifier si le joueur a terminé la partie
     if (updatedPlayer.progress >= 100) {
-      console.log(
-        `GameService.updatePlayerProgress - Joueur ${playerId} a terminé avec ${updatedPlayer.progress}% de progression`
-      );
       this.checkGameCompletion(lobbyId, playerId);
+    } else {
+      // Vérifier si le joueur a répondu à tous les pays actifs (même s'il n'en a validé aucun)
+      const totalAnswered =
+        updatedPlayer.validatedCountries.length +
+        updatedPlayer.incorrectCountries.length;
+      if (totalQuestions > 0 && totalAnswered >= totalQuestions) {
+        this.checkGameCompletion(lobbyId, playerId);
+      }
     }
 
     BroadcastManager.broadcastPlayerProgressUpdate(lobbyId, lobby);
@@ -191,13 +196,8 @@ export class GameService {
    * Vérifie si la partie est terminée
    */
   private static checkGameCompletion(lobbyId: string, playerId: string): void {
-    console.log(
-      `GameService.checkGameCompletion - Début pour lobbyId: ${lobbyId}, playerId: ${playerId}`
-    );
-
     const lobby = LobbyLifecycleManager.getLobbyInMemory(lobbyId);
     if (!lobby) {
-      console.log(`Lobby ${lobbyId} non trouvé en mémoire`);
       return;
     }
 
@@ -216,16 +216,9 @@ export class GameService {
     }
 
     if (allFinished) {
-      console.log(
-        `🎯 GameService.checkGameCompletion - Tous les joueurs ont terminé, appel de endGame pour le lobby ${lobbyId}`
-      );
       this.endGame(lobbyId).catch((error) => {
         console.error("Erreur lors de la fin de jeu:", error);
       });
-    } else {
-      console.log(
-        `⏳ GameService.checkGameCompletion - Pas tous les joueurs ont terminé, pas de fin de jeu`
-      );
     }
   }
 
@@ -233,29 +226,16 @@ export class GameService {
    * Termine la partie
    */
   private static async endGame(lobbyId: string): Promise<void> {
-    console.log(`🏁 GameService.endGame - Début pour le lobby ${lobbyId}`);
-
     const lobby = LobbyLifecycleManager.getLobbyInMemory(lobbyId);
     if (!lobby) {
-      console.log(
-        `❌ GameService.endGame - Lobby ${lobbyId} non trouvé en mémoire`
-      );
       return;
     }
 
     lobby.status = "finished";
-    console.log(
-      `✅ GameService.endGame - Statut du lobby mis à jour vers 'finished' en mémoire`
-    );
-
-    const rankings = PlayerService.calculateRankings(lobby.players);
 
     // Mettre à jour le statut du lobby en base de données
     try {
       await LobbyService.updateLobbyStatus(lobbyId, "finished");
-      console.log(
-        `✅ GameService.endGame - Statut du lobby mis à jour vers 'finished' en base de données`
-      );
     } catch (error) {
       console.error(
         `Erreur lors de la mise à jour du statut du lobby ${lobbyId} en base de données:`,
@@ -264,13 +244,9 @@ export class GameService {
     }
 
     BroadcastManager.broadcastGameEnd(lobbyId);
-    console.log(`📢 GameService.endGame - game_end diffusé`);
 
     // Diffuser un lobby_update avec le status finished pour synchroniser le frontend
     await BroadcastManager.broadcastLobbyUpdate(lobbyId, lobby);
-    console.log(
-      `📢 GameService.endGame - lobby_update diffusé avec statut finished`
-    );
   }
 
   /**
