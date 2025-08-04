@@ -7,7 +7,7 @@ set -e
 # Fonction de nettoyage
 cleanup() {
   echo "🧹 Nettoyage..."
-  docker-compose -f docker-compose.test.yml down
+  docker compose -f docker-compose.test.yml down
   echo "✅ Tests terminés !"
   exit 0
 }
@@ -18,11 +18,11 @@ trap cleanup SIGINT SIGTERM
 echo "🐳 Démarrage de la base de données de test..."
 
 # Démarrer PostgreSQL de test
-docker-compose -f docker-compose.test.yml up -d postgres-test
+docker compose -f docker-compose.test.yml up -d postgres-test
 
 # Attendre que PostgreSQL soit prêt
 echo "⏳ Attente que PostgreSQL soit prêt..."
-until docker-compose -f docker-compose.test.yml exec -T postgres-test pg_isready -U postgres; do
+until docker compose -f docker-compose.test.yml exec -T postgres-test pg_isready -U postgres; do
   echo "PostgreSQL n'est pas encore prêt, attente..."
   sleep 2
 done
@@ -93,7 +93,7 @@ npx jest $JEST_ARGS
 # Nettoyer seulement si pas en mode watch
 if [ "$WATCH_MODE" = false ]; then
   echo "🧹 Nettoyage..."
-  docker-compose -f docker-compose.test.yml down
+  docker compose -f docker-compose.test.yml down
   echo "✅ Tests terminés !"
 else
   echo "👀 Mode watch actif - Appuyez sur Ctrl+C pour arrêter"
