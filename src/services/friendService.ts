@@ -86,14 +86,24 @@ export class FriendService {
 
     if (action === "accept") {
       await FriendModel.createMutualFriendship(request.senderId, userId);
+
+      // CORRECTIF C4.2.2: Notifier seulement l'utilisateur qui a envoyé la demande (User A)
+      // User B voit déjà sa liste se mettre à jour automatiquement
+      // Ce correctif a été implémenté suite au retour utilisateur signalant que
+      // l'expéditeur devait rafraîchir la page pour voir sa liste d'amis mise à jour
+      sendToUser(request.senderId, {
+        type: "friend_request_accepted",
+        payload: {
+          success: true,
+          acceptedBy: userId,
+          friendId: userId,
+        },
+      });
     }
 
     return {
       success: true,
-      message:
-        action === "accept"
-          ? "Demande acceptée"
-          : "Demande rejetée",
+      message: action === "accept" ? "Demande acceptée" : "Demande rejetée",
     };
   }
 

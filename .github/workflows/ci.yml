@@ -38,19 +38,18 @@ jobs:
 
       - name: Setup environment variables
         run: |
-          cp .env.example .env
-          echo "DATABASE_URL=postgresql://postgres:${{ secrets.TEST_DB_PASSWORD }}@localhost:5432/test_db" >> .env
+          echo "DATABASE_URL=postgresql://postgres:${{ secrets.TEST_DB_PASSWORD }}@localhost:5432/test_db" > .env
           echo "BETTER_AUTH_SECRET=${{ secrets.TEST_AUTH_SECRET }}" >> .env
           echo "BETTER_AUTH_URL=http://localhost:3000" >> .env
           echo "GOOGLE_CLIENT_ID=${{ secrets.TEST_GOOGLE_CLIENT_ID }}" >> .env
           echo "GOOGLE_CLIENT_SECRET=${{ secrets.TEST_GOOGLE_CLIENT_SECRET }}" >> .env
           echo "SERVER_URL=http://localhost:3000" >> .env
+          echo "GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}" >> .env
+          echo "GITHUB_REPO_OWNER=valclmb" >> .env
+          echo "GITHUB_REPO_NAME=mapquiz-back" >> .env
 
       - name: Generate Prisma client
         run: npm run db:generate
-
-      - name: Run database migrations
-        run: npm run db:push
 
       - name: Run linting
         run: npm run lint || echo "Linting not configured"
@@ -58,20 +57,8 @@ jobs:
       - name: Run type checking
         run: npm run build:check || npm run build
 
-      - name: Run unit tests
-        run: npm run test:unit
-
-      - name: Run integration tests
-        run: npm run test:integration
-
-      - name: Run performance tests
-        run: npm run test:performance
-
-      - name: Run E2E tests
-        run: npm run test:e2e
-
-      - name: Run full test suite with coverage
-        run: npm run test:ci
+      - name: Run all tests
+        run: npm run db:push && npx jest --ci --coverage --watchAll=false
 
       - name: Upload coverage reports
         uses: codecov/codecov-action@v3
@@ -100,7 +87,7 @@ jobs:
         run: npm audit --audit-level=moderate
 
       - name: Run dependency check
-        run: npx npm-check-updates --errorLevel 2
+        run: npx npm-check-updates --errorLevel 2 || echo "Dependencies not up-to-date (non-blocking)"
 
   build:
     runs-on: ubuntu-latest

@@ -1,6 +1,6 @@
 import { FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
-import { BugReportService } from "../services/bugReportService.js";
+import { GitHubService } from "../services/githubService.js";
 
 // Schéma de validation pour la création d'un rapport de bug
 const createBugReportSchema = z.object({
@@ -48,16 +48,18 @@ export class BugReportController {
         validatedData.userAgent = request.headers["user-agent"];
       }
 
-      const bugReport = await BugReportService.createBugReport(validatedData);
+      // Créer l'issue GitHub au lieu de sauvegarder en base de données
+      const githubIssue = await GitHubService.createIssueFromBugReport(
+        validatedData
+      );
 
       return reply.status(201).send({
         success: true,
-        message: "Rapport de bug créé avec succès",
+        message: githubIssue.message,
         data: {
-          id: bugReport.id,
-          title: bugReport.title,
-          status: bugReport.status,
-          createdAt: bugReport.createdAt,
+          issueNumber: githubIssue.issueNumber,
+          issueUrl: githubIssue.issueUrl,
+          title: validatedData.title,
         },
       });
     } catch (error) {
