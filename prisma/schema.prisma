@@ -200,7 +200,6 @@ model BugReport {
   userAgent         String?
   url               String?          // URL de la page où le problème a été rencontré
   status            BugReportStatus  @default(OPEN)
-  attachments       String[]         @default([]) // URLs des fichiers attachés
   analysis          String?          // Analyse technique du bug
   solution          String?          // Solution proposée
   resolutionNotes   String?          // Notes de résolution

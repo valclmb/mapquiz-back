@@ -22,7 +22,6 @@ const createBugReportSchema = z.object({
   }),
   userAgent: z.string().optional(),
   url: z.string().optional(),
-  attachments: z.array(z.string()).optional(),
 });
 
 export class BugReportController {

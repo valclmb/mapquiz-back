@@ -13,7 +13,6 @@ export interface CreateBugReportData {
   userAgent?: string;
   url?: string;
   reporterId?: string;
-  attachments?: string[];
 }
 
 import { prisma } from "../lib/database.js";
@@ -33,7 +32,6 @@ export class BugReportModel {
         userAgent: data.userAgent,
         url: data.url,
         reporterId: data.reporterId,
-        attachments: data.attachments,
         status: "OPEN",
       },
     });
