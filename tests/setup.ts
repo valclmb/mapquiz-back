@@ -36,11 +36,11 @@ async function cleanDatabase() {
   }
 }
 
-// Mock des variables d'environnement pour les tests
+// Configuration de la base de données de test
 process.env.NODE_ENV = "test";
 process.env.DATABASE_URL =
   process.env.TEST_DATABASE_URL ||
-  "postgresql://test:test@localhost:5432/mapquiz_test";
+  "postgresql://postgres:test_password@localhost:5433/test_db";
 process.env.BETTER_AUTH_URL = "http://localhost:3000";
 process.env.SERVER_URL = "http://localhost:3000";
 process.env.GOOGLE_CLIENT_ID = "test-client-id";
