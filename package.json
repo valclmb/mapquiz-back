@@ -19,7 +19,7 @@
     "test:integration": "./scripts/test-setup.sh --integration",
     "test:e2e": "./scripts/test-setup.sh --e2e",
     "test:performance": "./scripts/test-setup.sh --performance",
-    "test:ci": "jest --ci --coverage --watchAll=false",
+    "test:ci": "./scripts/test-setup.sh --ci",
     "test:debug": "./scripts/test-setup.sh --debug",
     "test:docker:start": "docker compose -f docker-compose.test.yml up -d",
     "test:docker:stop": "docker compose -f docker-compose.test.yml down",

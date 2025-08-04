@@ -59,7 +59,7 @@ jobs:
         run: npm run build:check || npm run build
 
       - name: Run all tests
-        run: npm run test:ci
+        run: npm run db:push && jest --ci --coverage --watchAll=false
 
       - name: Upload coverage reports
         uses: codecov/codecov-action@v3

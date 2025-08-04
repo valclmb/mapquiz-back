@@ -4,53 +4,16 @@
 
 set -e
 
-# Fonction de nettoyage
-cleanup() {
-  echo "🧹 Nettoyage..."
-  docker compose -f docker-compose.test.yml down
-  echo "✅ Tests terminés !"
-  exit 0
-}
-
-# Capturer Ctrl+C pour nettoyer en mode watch
-trap cleanup SIGINT SIGTERM
-
-echo "🐳 Démarrage de la base de données de test..."
-
-# Démarrer PostgreSQL de test
-docker compose -f docker-compose.test.yml up -d postgres-test
-
-# Attendre que PostgreSQL soit prêt
-echo "⏳ Attente que PostgreSQL soit prêt..."
-until docker compose -f docker-compose.test.yml exec -T postgres-test pg_isready -U postgres; do
-  echo "PostgreSQL n'est pas encore prêt, attente..."
-  sleep 2
-done
-
-echo "✅ PostgreSQL de test est prêt !"
-
-# Configurer les variables d'environnement pour les tests
-export TEST_DATABASE_URL="postgresql://postgres:test_password@localhost:5433/test_db"
-export DATABASE_URL="$TEST_DATABASE_URL"
-export NODE_ENV="test"
-
-echo "🔧 Configuration des variables d'environnement..."
-echo "DATABASE_URL=$DATABASE_URL"
-
-# Générer le client Prisma
-echo "🔨 Génération du client Prisma..."
-npm run db:generate
-
-# Appliquer les migrations
-echo "📦 Application des migrations..."
-npm run db:push
-
 # Analyser les arguments
 JEST_ARGS=""
 WATCH_MODE=false
 
 while [[ $# -gt 0 ]]; do
   case $1 in
+    --ci)
+      JEST_ARGS="$JEST_ARGS --ci --coverage --watchAll=false"
+      shift
+      ;;
     --watch)
       JEST_ARGS="$JEST_ARGS --watch"
       WATCH_MODE=true
@@ -86,6 +49,50 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+# Fonction de nettoyage
+cleanup() {
+  echo "🧹 Nettoyage..."
+  docker compose -f docker-compose.test.yml down
+  echo "✅ Tests terminés !"
+  exit 0
+}
+
+# Capturer Ctrl+C pour nettoyer en mode watch
+trap cleanup SIGINT SIGTERM
+
+echo "🐳 Démarrage de la base de données de test..."
+
+# Démarrer PostgreSQL de test
+docker compose -f docker-compose.test.yml up -d postgres-test
+
+# Attendre que PostgreSQL soit prêt
+echo "⏳ Attente que PostgreSQL soit prêt..."
+until docker compose -f docker-compose.test.yml exec -T postgres-test pg_isready -U postgres; do
+  echo "PostgreSQL n'est pas encore prêt, attente..."
+  sleep 2
+done
+
+echo "✅ PostgreSQL de test est prêt !"
+
+# Configurer les variables d'environnement pour les tests
+export NODE_ENV="test"
+export TEST_DATABASE_URL="postgresql://postgres:test_password@localhost:5433/test_db"
+export DATABASE_URL="$TEST_DATABASE_URL"
+echo "🐳 Utilisation de Docker (port 5433)"
+
+echo "🔧 Configuration des variables d'environnement..."
+echo "DATABASE_URL=$DATABASE_URL"
+
+# Générer le client Prisma
+echo "🔨 Génération du client Prisma..."
+npm run db:generate
+
+# Appliquer les migrations
+echo "📦 Application des migrations..."
+npm run db:push
+
+
 
 echo "🚀 Lancement des tests avec Jest..."
 npx jest $JEST_ARGS
