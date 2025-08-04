@@ -11,10 +11,7 @@ const createBugReportSchema = z.object({
   description: z
     .string()
     .min(10, "La description doit contenir au moins 10 caractères"),
-  stepsToReproduce: z
-    .string()
-    .min(10, "Les étapes de reproduction doivent être détaillées")
-    .optional(),
+  stepsToReproduce: z.string().optional(),
   location: z.string().optional(),
   environment: z.object({
     browser: z.string().optional(),
@@ -24,7 +21,7 @@ const createBugReportSchema = z.object({
     screenResolution: z.string().optional(),
   }),
   userAgent: z.string().optional(),
-  url: z.string().url().optional(),
+  url: z.string().optional(),
   attachments: z.array(z.string()).optional(),
 });
 
