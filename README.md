@@ -1,143 +1,133 @@
-# Map Quiz - Backend API
+# MAP2 Backend
 
-## 🚀 Description
+Backend pour l'application MAP2 - Quiz géographique avec mode multijoueur.
 
-API backend pour l'application Map Quiz, construite avec Fastify, Prisma et Better Auth. Cette API gère l'authentification, les utilisateurs et le système d'amis.
+## 🚀 Installation
 
-## 🛠️ Technologies
-
-- **Framework**: Fastify
-- **Base de données**: PostgreSQL avec Prisma ORM
-- **Authentification**: Better Auth avec Google OAuth
-- **Sécurité**: Helmet, CORS, Rate Limiting
-- **Langage**: TypeScript
-
-## 📋 Prérequis
-
+### Prérequis
 - Node.js 18+
 - PostgreSQL
-- Compte Google Cloud (pour OAuth)
+- pnpm (recommandé) ou npm
 
-## 🔧 Installation
-
-1. Clonez le repository
-
+### 1. Installation des dépendances
 ```bash
-git clone <votre-repo>
-cd backend
+pnpm install
 ```
 
-2. Installez les dépendances
+### 2. Configuration de la base de données
+```bash
+# Copier le fichier d'environnement
+cp .env.example .env
 
-```
-npm install
-```
-
-3. Configurez les variables d'environnement
-
-```
-cp .env.example .env
+# Modifier les variables dans .env
+DATABASE_URL="postgresql://username:password@localhost:5432/map"
 ```
 
-Variables requises :
+### 3. Base de données
+```bash
+# Appliquer les migrations
+npx prisma migrate dev
 
-```
-DATABASE_URL="postgresql://
-user:password@localhost:5432/mapquiz"
-BETTER_AUTH_SECRET="votre-secret-aleatoire"
-BETTER_AUTH_URL="http://localhost:5173"
-GOOGLE_CLIENT_ID="votre-google-client-id"
-GOOGLE_CLIENT_SECRET="votre-google-client-secre
-t"
-SERVER_URL="http://localhost:3000"
+# Générer le client Prisma
+npx prisma generate
 ```
 
-4. Configurez la base de données
+### 4. Démarrage
+```bash
+# Mode développement
+pnpm run dev
 
-```
-npm run db:push
-npm run db:generate
-```
-
-## 🚀 Démarrage
-
-### Développement
-
-```
-npm run dev
+# Mode production
+pnpm run build
+pnpm start
 ```
 
-### Production
+## 📊 Base de données
 
-```
-npm run build
-npm start
-```
+### Migrations disponibles
+- `20250627080124_init` - Initialisation
+- `20250701103155_game_historix` - Historique des jeux
+- `20250703072410_multilobbies` - Système de lobbies multijoueur
+- `20250717102044_add_game_state_persistence` - Persistance des états de jeu
+- `20250723222910_add_authorized_players` - Joueurs autorisés
+- `20250723231253_add_presence_status` - Statut de présence
+- `20250724100610_absent` - Gestion des absences
+- `20250804102900_add_bug_reports_simplified` - Système de signalement de bugs
 
-## 📚 API Endpoints
+### Modèles principaux
+- `User` - Utilisateurs
+- `GameScore` - Scores de jeu
+- `GameLobby` - Lobbies multijoueur
+- `BugReport` - Rapports de bugs
+- `Friend` / `FriendRequest` - Système d'amis
+
+## 🔧 API Endpoints
 
 ### Authentification
+- `POST /auth/login` - Connexion
+- `POST /auth/logout` - Déconnexion
 
-- GET/POST /auth/\* - Gestion de l'authentification Better Auth
-- GET /auth/callback/google - Callback OAuth Google
+### Jeux
+- `POST /scores` - Sauvegarder un score
+- `GET /scores` - Récupérer les scores
 
-### Utilisateurs
+### Multijoueur
+- `POST /lobbies` - Créer un lobby
+- `GET /lobbies` - Lister les lobbies
+- `POST /lobbies/:id/join` - Rejoindre un lobby
 
-- GET /users - Liste des utilisateurs
-- GET /users/:id - Profil utilisateur
+### Bugs
+- `POST /bug-reports` - Signaler un bug
 
 ### Amis
+- `POST /friends/request` - Envoyer une demande d'ami
+- `GET /friends` - Lister les amis
 
-- GET /friends - Liste des amis
-- POST /friends/add - Ajouter un ami
-- DELETE /friends/remove - Supprimer un ami
-- GET /friends/requests - Demandes d'amis
+## 🧪 Tests
 
-### Santé
+```bash
+# Tests unitaires
+pnpm test
 
-- GET /health - Vérification de l'état de l'API
+# Tests d'intégration
+pnpm test:integration
 
-## 🗄️ Base de données
+# Tests E2E
+pnpm test:e2e
+```
 
-Le schéma Prisma inclut :
+## 📝 Structure du projet
 
-- User : Utilisateurs avec authentification
-- Session : Sessions utilisateur
-- Account : Comptes OAuth
-- Friendship : Relations d'amitié
+```
+src/
+├── controllers/     # Contrôleurs API
+├── services/        # Logique métier
+├── models/          # Modèles de données
+├── routes/          # Routes API
+├── middleware/      # Middleware
+├── lib/            # Utilitaires
+└── types/          # Types TypeScript
+```
 
-## 🔒 Sécurité
+## 🐛 Signalement de bugs
 
-- Helmet : Protection des headers HTTP
-- CORS : Configuration cross-origin
-- Rate Limiting : 100 requêtes/minute
-- Better Auth : Authentification sécurisée
+Le système de signalement de bugs a été simplifié pour une meilleure expérience utilisateur :
 
-## 📝 Scripts disponibles
+### Champs requis
+- **Titre** : Description courte du problème
+- **Description** : Détails du problème
 
-- npm run dev - Démarrage en mode développement
-- npm run build - Build de production
-- npm start - Démarrage en production
-- npm run db:push - Synchroniser le schéma DB
-- npm run db:migrate - Créer une migration
-- npm run db:studio - Interface Prisma Studio
+### Champs optionnels
+- **Étapes de reproduction** : Comment reproduire le bug
+- **Localisation** : Où le problème a été rencontré
 
-## 🔧 Configuration
+### Informations automatiques
+- Navigateur et version
+- Système d'exploitation
+- Type d'appareil
+- Résolution d'écran
+- URL de la page
 
-### Fastify
+## 📄 Licence
 
-- Configuration dans src/server.ts
-- Plugins : CORS, Helmet, Rate Limiting
-- Routes modulaires dans /routes
-
-### Prisma
-
-- Schéma dans prisma/schema.prisma
-- Migrations dans prisma/migrations/
-- Client généré automatiquement
-
-### Better Auth
-
-- Configuration OAuth Google
-- Sessions sécurisées
-- Middleware d'authentification
+MIT

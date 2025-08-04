@@ -13,9 +13,9 @@ const createBugReportSchema = z.object({
     .min(10, "La description doit contenir au moins 10 caractères"),
   stepsToReproduce: z
     .string()
-    .min(10, "Les étapes de reproduction doivent être détaillées"),
-  expectedBehavior: z.string().min(5, "Le comportement attendu est requis"),
-  actualBehavior: z.string().min(5, "Le comportement actuel est requis"),
+    .min(10, "Les étapes de reproduction doivent être détaillées")
+    .optional(),
+  location: z.string().optional(),
   environment: z.object({
     browser: z.string().optional(),
     browserVersion: z.string().optional(),
@@ -25,8 +25,6 @@ const createBugReportSchema = z.object({
   }),
   userAgent: z.string().optional(),
   url: z.string().url().optional(),
-  component: z.string().optional(),
-  priority: z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]).default("MEDIUM"),
   attachments: z.array(z.string()).optional(),
 });
 

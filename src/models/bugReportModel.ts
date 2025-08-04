@@ -1,9 +1,8 @@
 export interface CreateBugReportData {
   title: string;
   description: string;
-  stepsToReproduce: string;
-  expectedBehavior: string;
-  actualBehavior: string;
+  stepsToReproduce?: string;
+  location?: string;
   environment: {
     browser?: string;
     browserVersion?: string;
@@ -13,8 +12,6 @@ export interface CreateBugReportData {
   };
   userAgent?: string;
   url?: string;
-  component?: string;
-  priority: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
   reporterId?: string;
   attachments?: string[];
 }
@@ -31,13 +28,10 @@ export class BugReportModel {
         title: data.title,
         description: data.description,
         stepsToReproduce: data.stepsToReproduce,
-        expectedBehavior: data.expectedBehavior,
-        actualBehavior: data.actualBehavior,
+        location: data.location,
         environment: data.environment,
         userAgent: data.userAgent,
         url: data.url,
-        component: data.component,
-        priority: data.priority,
         reporterId: data.reporterId,
         attachments: data.attachments,
         status: "OPEN",

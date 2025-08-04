@@ -194,14 +194,11 @@ model BugReport {
   id                String           @id @default(uuid())
   title             String
   description       String
-  stepsToReproduce  String
-  expectedBehavior  String
-  actualBehavior    String
+  stepsToReproduce  String?
+  location          String?          // Où l'utilisateur a rencontré le problème
   environment       Json             // Informations sur l'environnement (navigateur, OS, etc.)
   userAgent         String?
-  url               String?
-  component         String?          // Composant concerné (ex: "QuizGame", "WebSocket", etc.)
-  priority          BugReportPriority @default(MEDIUM)
+  url               String?          // URL de la page où le problème a été rencontré
   status            BugReportStatus  @default(OPEN)
   attachments       String[]         @default([]) // URLs des fichiers attachés
   analysis          String?          // Analyse technique du bug
