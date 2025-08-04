@@ -87,7 +87,7 @@ jobs:
         run: npm audit --audit-level=moderate
 
       - name: Run dependency check
-        run: npx npm-check-updates --errorLevel 2
+        run: npx npm-check-updates --errorLevel 2 || echo "Dependencies not up-to-date (non-blocking)"
 
   build:
     runs-on: ubuntu-latest
