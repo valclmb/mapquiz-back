@@ -34,6 +34,9 @@ model User {
   hostedLobbies    GameLobby[]     @relation("LobbyHost")
   lobbyPlayers     LobbyPlayer[]
   multiplayerResults MultiplayerGameResult[]
+  
+  // Relations pour les rapports de bugs
+  reportedBugs      BugReport[]    @relation("ReportedBugs")
 
   @@unique([email])
   @@map("user")
@@ -171,4 +174,43 @@ model MultiplayerGameResult {
   createdAt   DateTime @default(now())
 
   @@map("multiplayer_game_result")
+}
+
+enum BugReportStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum BugReportPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+model BugReport {
+  id                String           @id @default(uuid())
+  title             String
+  description       String
+  stepsToReproduce  String
+  expectedBehavior  String
+  actualBehavior    String
+  environment       Json             // Informations sur l'environnement (navigateur, OS, etc.)
+  userAgent         String?
+  url               String?
+  component         String?          // Composant concerné (ex: "QuizGame", "WebSocket", etc.)
+  priority          BugReportPriority @default(MEDIUM)
+  status            BugReportStatus  @default(OPEN)
+  attachments       String[]         @default([]) // URLs des fichiers attachés
+  analysis          String?          // Analyse technique du bug
+  solution          String?          // Solution proposée
+  resolutionNotes   String?          // Notes de résolution
+  reporterId        String?
+  reporter          User?            @relation("ReportedBugs", fields: [reporterId], references: [id])
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  @@map("bug_report")
 }
