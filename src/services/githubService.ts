@@ -22,7 +22,6 @@ export class GitHubService {
     process.env.GITHUB_REPO_OWNER || "valclmb";
   private static readonly REPO_NAME =
     process.env.GITHUB_REPO_NAME || "mapquiz-back";
-  private static readonly GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 
   /**
    * Crée une issue GitHub à partir d'un bug report
@@ -30,7 +29,8 @@ export class GitHubService {
   static async createIssueFromBugReport(
     bugReport: BugReportData
   ): Promise<any> {
-    if (!this.GITHUB_TOKEN) {
+    const githubToken = process.env.GITHUB_TOKEN;
+    if (!githubToken) {
       throw new Error("GitHub token non configuré");
     }
 
@@ -41,7 +41,7 @@ export class GitHubService {
       {
         method: "POST",
         headers: {
-          Authorization: `token ${this.GITHUB_TOKEN}`,
+          Authorization: `token ${githubToken}`,
           Accept: "application/vnd.github.v3+json",
           "Content-Type": "application/json",
         },
@@ -128,7 +128,8 @@ ${bugReport.location}
     issueNumber: number,
     status: "in-progress" | "resolved" | "closed"
   ): Promise<void> {
-    if (!this.GITHUB_TOKEN) {
+    const githubToken = process.env.GITHUB_TOKEN;
+    if (!githubToken) {
       throw new Error("GitHub token non configuré");
     }
 
@@ -143,7 +144,7 @@ ${bugReport.location}
       {
         method: "PATCH",
         headers: {
-          Authorization: `token ${this.GITHUB_TOKEN}`,
+          Authorization: `token ${githubToken}`,
           Accept: "application/vnd.github.v3+json",
           "Content-Type": "application/json",
         },
