@@ -45,6 +45,9 @@ jobs:
           echo "GOOGLE_CLIENT_ID=${{ secrets.TEST_GOOGLE_CLIENT_ID }}" >> .env
           echo "GOOGLE_CLIENT_SECRET=${{ secrets.TEST_GOOGLE_CLIENT_SECRET }}" >> .env
           echo "SERVER_URL=http://localhost:3000" >> .env
+          echo "GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}" >> .env
+          echo "GITHUB_REPO_OWNER=valclmb" >> .env
+          echo "GITHUB_REPO_NAME=mapquiz-back" >> .env
 
       - name: Generate Prisma client
         run: npm run db:generate
