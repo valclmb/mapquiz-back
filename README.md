@@ -30,33 +30,31 @@ cd backend
 2. Installez les dépendances
 
 ```
-npm install
+npm install
 ```
 
 3. Configurez les variables d'environnement
 
 ```
-cp .env.example .env
+cp .env.example .env
 ```
 
 Variables requises :
 
 ```
-DATABASE_URL="postgresql://
-user:password@localhost:5432/mapquiz"
+DATABASE_URL="postgresql://user:password@localhost:5432/mapquiz"
 BETTER_AUTH_SECRET="votre-secret-aleatoire"
 BETTER_AUTH_URL="http://localhost:5173"
 GOOGLE_CLIENT_ID="votre-google-client-id"
-GOOGLE_CLIENT_SECRET="votre-google-client-secre
-t"
+GOOGLE_CLIENT_SECRET="votre-google-client-secret"
 SERVER_URL="http://localhost:3000"
 ```
 
 4. Configurez la base de données
 
 ```
-npm run db:push
-npm run db:generate
+npm run db:push
+npm run db:generate
 ```
 
 ## 🚀 Démarrage
@@ -64,14 +62,14 @@ npm run db:generate
 ### Développement
 
 ```
-npm run dev
+npm run dev
 ```
 
 ### Production
 
 ```
-npm run build
-npm start
+npm run build
+npm start
 ```
 
 ## 📚 API Endpoints

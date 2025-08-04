@@ -25,3 +25,28 @@ export async function requireAuth(
     return reply.status(401).send({ error: "Token invalide" });
   }
 }
+
+export async function optionalAuth(
+  request: FastifyRequest,
+  reply: FastifyReply
+) {
+  try {
+    // Convert Fastify headers to standard Headers object
+    const headers = new Headers();
+    Object.entries(request.headers).forEach(([key, value]) => {
+      if (value) headers.append(key, value.toString());
+    });
+
+    const session = await auth.api.getSession({ headers });
+
+    // Attacher l'utilisateur à la requête s'il existe
+    if (session?.user) {
+      (request as any).user = session.user;
+      (request as any).session = session;
+    }
+    // Si pas d'utilisateur, on continue sans bloquer
+  } catch (error) {
+    // En cas d'erreur, on continue sans bloquer
+    console.log("Auth optionnelle échouée:", error);
+  }
+}
