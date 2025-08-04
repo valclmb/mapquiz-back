@@ -38,8 +38,7 @@ jobs:
 
       - name: Setup environment variables
         run: |
-          cp .env.example .env
-          echo "DATABASE_URL=postgresql://postgres:${{ secrets.TEST_DB_PASSWORD }}@localhost:5432/test_db" >> .env
+          echo "DATABASE_URL=postgresql://postgres:${{ secrets.TEST_DB_PASSWORD }}@localhost:5432/test_db" > .env
           echo "BETTER_AUTH_SECRET=${{ secrets.TEST_AUTH_SECRET }}" >> .env
           echo "BETTER_AUTH_URL=http://localhost:3000" >> .env
           echo "GOOGLE_CLIENT_ID=${{ secrets.TEST_GOOGLE_CLIENT_ID }}" >> .env
