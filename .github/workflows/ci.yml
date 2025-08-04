@@ -52,9 +52,6 @@ jobs:
       - name: Generate Prisma client
         run: npm run db:generate
 
-      - name: Run database migrations
-        run: npm run db:push
-
       - name: Run linting
         run: npm run lint || echo "Linting not configured"
 
