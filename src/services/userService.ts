@@ -1,5 +1,6 @@
 import { generateRandomTag } from "../lib/generateTag.js";
 import * as UserModel from "../models/userModel.js";
+import type { UserListItem } from "../types/user.js";
 
 /**
  * Service unifié pour la gestion des utilisateurs
@@ -48,7 +49,7 @@ export class UserService {
         tag: user.tag,
         isOnline: user.isOnline,
         lastSeen: user.lastSeen,
-      })),
+      })) as UserListItem[],
     };
   }
 

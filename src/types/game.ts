@@ -21,3 +21,23 @@ export interface PlayerProgressRequest {
   score: number;
   progress: number;
 }
+
+// Types pour les données de base de données
+export interface DatabaseGameScore {
+  id: string;
+  userId: string;
+  score: number;
+  totalQuestions: number;
+  selectedRegions: string[];
+  gameMode: string;
+  duration?: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface ScoreHistoryItem {
+  score: number;
+  duration: number;
+  selectedRegions: string[];
+  date: string;
+}

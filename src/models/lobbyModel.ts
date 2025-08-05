@@ -1,4 +1,5 @@
 import { prisma } from "../lib/database.js";
+import type { LobbySettings } from "../types/lobby.js";
 
 /**
  * Modèle ultra-simplifié pour la gestion des lobbies
@@ -8,7 +9,7 @@ import { prisma } from "../lib/database.js";
 export const createLobby = async (
   hostId: string,
   name: string,
-  settings: any
+  settings: LobbySettings
 ) => {
   return await prisma.gameLobby.create({
     data: {
@@ -118,7 +119,10 @@ export const updatePlayerGameData = async (
 };
 
 // Mettre à jour les paramètres du lobby
-export const updateLobbySettings = async (lobbyId: string, settings: any) => {
+export const updateLobbySettings = async (
+  lobbyId: string,
+  settings: LobbySettings
+) => {
   return await prisma.gameLobby.update({
     where: { id: lobbyId },
     data: {
@@ -156,10 +160,13 @@ export const areAllPlayersReady = async (lobbyId: string, hostId: string) => {
 };
 
 // Sauvegarder l'état du jeu
-export const saveGameState = async (lobbyId: string, gameState: any) => {
+export const saveGameState = async (
+  lobbyId: string,
+  gameState: Record<string, unknown>
+) => {
   return await prisma.gameLobby.update({
     where: { id: lobbyId },
-    data: { gameState },
+    data: { gameState: gameState as any },
   });
 };
 
@@ -277,7 +284,7 @@ export const updateLobbyAuthorizedPlayers = async (
   } else {
     // Retirer l'utilisateur de la liste
     newAuthorizedPlayers = lobby.authorizedPlayers.filter(
-      (id) => id !== userId
+      (id: string) => id !== userId
     );
   }
 

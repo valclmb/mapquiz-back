@@ -1,5 +1,6 @@
 import * as LobbyModel from "../models/lobbyModel.js";
 import * as UserModel from "../models/userModel.js";
+import type { LobbySettings, PlayerRanking } from "../types/lobby.js";
 import { sendToUser } from "../websocket/core/connectionManager.js";
 import { LobbyLifecycleManager } from "../websocket/lobby/lobbyLifecycle.js";
 
@@ -14,14 +15,14 @@ export class LobbyService {
   static async createLobby(
     hostId: string,
     name: string,
-    settings: any = {}
+    settings: LobbySettings = {}
   ): Promise<{
     success: boolean;
     lobbyId: string;
     hostId: string;
-    settings: any;
-    lobby?: any;
-    players?: any[];
+    settings: LobbySettings;
+    lobby?: unknown;
+    players?: unknown[];
   }> {
     try {
       // Vérifier que l'utilisateur existe
@@ -183,7 +184,7 @@ export class LobbyService {
    */
   static async saveGameState(
     lobbyId: string,
-    gameState: any
+    gameState: Record<string, unknown>
   ): Promise<boolean> {
     try {
       await LobbyModel.saveGameState(lobbyId, gameState);
@@ -255,17 +256,17 @@ export class LobbyService {
       const players = lobby.players;
 
       // Créer le classement
-      const rankings = players
+      const rankings: PlayerRanking[] = players
         .map((player) => ({
           id: player.userId,
           name: player.user.name,
           score: player.score || 0,
           rank: 0, // Sera calculé ci-dessous
         }))
-        .sort((a, b) => b.score - a.score); // Tri par score décroissant
+        .sort((a: PlayerRanking, b: PlayerRanking) => b.score - a.score); // Tri par score décroissant
 
       // Assigner les rangs
-      rankings.forEach((player, index) => {
+      rankings.forEach((player: PlayerRanking, index: number) => {
         player.rank = index + 1;
       });
 
@@ -285,7 +286,7 @@ export class LobbyService {
   static async updateLobbySettings(
     userId: string,
     lobbyId: string,
-    settings: any
+    settings: LobbySettings
   ): Promise<boolean> {
     try {
       // Vérifier que l'utilisateur est bien l'hôte du lobby
