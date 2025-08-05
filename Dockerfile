@@ -20,9 +20,12 @@ FROM base AS build
 RUN apt-get update -qq && \
     apt-get install --no-install-recommends -y build-essential node-gyp openssl pkg-config python-is-python3
 
-# Install node modules
+# Install node modules (including dev dependencies for build)
 COPY package.json package-lock.json ./
 RUN npm ci
+
+# Install types needed for build
+RUN npm install --no-save @types/node @types/ws
 
 # Copy application code
 COPY . .
@@ -33,8 +36,8 @@ RUN npx prisma generate
 # Build application
 RUN npm run build
 
-# Install only production dependencies (but keep types for runtime)
-RUN npm ci --only=production && npm install --no-save @types/node @types/ws
+# Install only production dependencies
+RUN npm ci --only=production
 
 
 # Final stage for app image
