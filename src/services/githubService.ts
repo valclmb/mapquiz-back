@@ -19,7 +19,7 @@ interface GitHubIssueBody {
 export class GitHubService {
   private static readonly GITHUB_API_URL = "https://api.github.com";
   private static readonly REPO_OWNER =
-    process.env.GITHUB_REPO_OWNER || "valclmb";
+    process.env.GITHUB_REPO_OWNER || "map-quiz";
   private static readonly REPO_NAME =
     process.env.GITHUB_REPO_NAME || "mapquiz-back";
 
