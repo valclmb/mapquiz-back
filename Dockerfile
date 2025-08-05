@@ -22,10 +22,7 @@ RUN apt-get update -qq && \
 
 # Install node modules (including dev dependencies for build)
 COPY package.json package-lock.json ./
-RUN npm ci
-
-# Install types needed for build
-RUN npm install --no-save @types/node @types/ws
+RUN npm ci --include=dev
 
 # Copy application code
 COPY . .
