@@ -144,7 +144,7 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
 
 // Gestion des erreurs non capturées
-process.on("uncaughtException", (error) => {
+process.on("uncaughtException", (error: Error) => {
   console.error("Exception non capturée", {
     error: error.message,
     stack: error.stack,
@@ -152,7 +152,7 @@ process.on("uncaughtException", (error) => {
   process.exit(1);
 });
 
-process.on("unhandledRejection", (reason, promise) => {
+process.on("unhandledRejection", (reason: unknown, promise: Promise<unknown>) => {
   console.error("Promesse rejetée non gérée", { reason, promise });
 });
 

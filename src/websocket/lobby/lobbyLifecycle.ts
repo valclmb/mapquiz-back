@@ -5,7 +5,7 @@ import { PlayerService } from "../../services/playerService.js";
 const activeLobbies = new Map();
 
 // Map pour stocker les timers de suppression différée
-const lobbyDeletionTimers = new Map<string, NodeJS.Timeout>();
+const lobbyDeletionTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 /**
  * Gestionnaire du cycle de vie des lobbies

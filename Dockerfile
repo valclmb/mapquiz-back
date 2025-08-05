@@ -33,8 +33,8 @@ RUN npx prisma generate
 # Build application
 RUN npm run build
 
-# Install only production dependencies
-RUN npm ci --only=production
+# Install only production dependencies (but keep types for runtime)
+RUN npm ci --only=production && npm install --no-save @types/node @types/ws
 
 
 # Final stage for app image
