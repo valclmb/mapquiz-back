@@ -1,7 +1,7 @@
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { customSession } from "better-auth/plugins";
-import { UserService } from "src/services/userService.js";
+import { UserService } from "../services/userService.js";
 import { prisma } from "./database.js";
 
 // Log temporaire pour debug
