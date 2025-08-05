@@ -49,7 +49,7 @@ export const handleCreateLobby = async (payload: any, userId: string) => {
     LobbyLifecycleManager.createLobby(
       result.lobbyId,
       userId,
-      result.players?.[0]?.name || "User",
+      (result.players?.[0] as { name?: string })?.name || "User",
       settings
     );
     console.log(`Lobby créé en mémoire: ${result.lobbyId}`);

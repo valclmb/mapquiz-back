@@ -1,5 +1,6 @@
 import * as ScoreModel from "../models/scoreModel.js";
 import * as UserModel from "../models/userModel.js";
+import type { ScoreHistoryItem } from "../types/game.js";
 
 /**
  * Service unifié pour la gestion des scores
@@ -58,7 +59,7 @@ export class ScoreService {
           month: "2-digit",
         }),
       }))
-      .reverse(); // Du plus ancien au plus récent pour le graphique
+      .reverse() as ScoreHistoryItem[]; // Du plus ancien au plus récent pour le graphique
   }
 
   /**
