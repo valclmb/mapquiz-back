@@ -31,6 +31,16 @@ export async function optionalAuth(
   reply: FastifyReply
 ) {
   try {
+    // En mode test, utiliser le header x-user-id pour simuler l'authentification
+    if (process.env.NODE_ENV === "test") {
+      const userId = request.headers["x-user-id"] as string;
+      if (userId) {
+        // Simuler un utilisateur pour les tests
+        (request as any).user = { id: userId };
+        return;
+      }
+    }
+
     // Convert Fastify headers to standard Headers object
     const headers = new Headers();
     Object.entries(request.headers).forEach(([key, value]) => {

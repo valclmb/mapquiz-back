@@ -66,15 +66,17 @@ const originalConsoleInfo = console.info;
 const originalConsoleWarn = console.warn;
 
 beforeEach(() => {
-  console.log = jest.fn();
-  console.info = jest.fn();
-  console.warn = jest.fn();
+  // Temporairement commenté pour voir les logs de débogage
+  // console.log = jest.fn();
+  // console.info = jest.fn();
+  // console.warn = jest.fn();
 });
 
 afterEach(() => {
-  console.log = originalConsoleLog;
-  console.info = originalConsoleInfo;
-  console.warn = originalConsoleWarn;
+  // Temporairement commenté pour voir les logs de débogage
+  // console.log = originalConsoleLog;
+  // console.info = originalConsoleInfo;
+  // console.warn = originalConsoleWarn;
 });
 
 // Utilitaires pour les tests
@@ -84,14 +86,15 @@ export const testUtils = {
     id: string = "test-user-id",
     name: string = "Test User"
   ) {
+    const uniqueTag = `TAG${id.slice(-4)}${Date.now()}${Math.random().toString(36).substr(2, 3)}`;
     return await prisma.user.upsert({
       where: { id },
-      update: { name },
+      update: { name, tag: uniqueTag },
       create: {
         id,
         name,
         email: `${id}@test.com`,
-        tag: `TAG${id.slice(-4)}`,
+        tag: uniqueTag,
         emailVerified: false,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -142,5 +145,24 @@ export const testUtils = {
   // Générer un ID unique
   generateId() {
     return `test-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  },
+
+  // Nettoyer la base de données
+  async cleanDatabase() {
+    const tablenames = await prisma.$queryRaw<
+      Array<{ tablename: string }>
+    >`SELECT tablename FROM pg_tables WHERE schemaname='public'`;
+
+    const tables = tablenames
+      .map(({ tablename }) => tablename)
+      .filter((name) => name !== "_prisma_migrations")
+      .map((name) => `"public"."${name}"`)
+      .join(", ");
+
+    try {
+      await prisma.$executeRawUnsafe(`TRUNCATE TABLE ${tables} CASCADE;`);
+    } catch (error) {
+      console.log({ error });
+    }
   },
 };

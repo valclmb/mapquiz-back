@@ -36,14 +36,23 @@ export const handleCreateLobby = async (payload: any, userId: string) => {
   const { name, settings } = payload;
 
   try {
+    console.log(
+      `🔍 Tentative de création de lobby pour l'utilisateur: ${userId}`
+    );
+
     // 1. Créer le lobby en base de données via le service
     const result = await LobbyService.createLobby(userId, name, settings);
 
     if (!result.success) {
+      console.log(
+        `❌ Échec de la création du lobby: ${
+          result.message || "Erreur inconnue"
+        }`
+      );
       return result;
     }
 
-    console.log(`Lobby créé en base de données: ${result.lobbyId}`);
+    console.log(`✅ Lobby créé en base de données: ${result.lobbyId}`);
 
     // 2. Créer le lobby en mémoire pour la gestion en temps réel
     LobbyLifecycleManager.createLobby(
@@ -52,12 +61,18 @@ export const handleCreateLobby = async (payload: any, userId: string) => {
       (result.players?.[0] as { name?: string })?.name || "User",
       settings
     );
-    console.log(`Lobby créé en mémoire: ${result.lobbyId}`);
+    console.log(`✅ Lobby créé en mémoire: ${result.lobbyId}`);
 
     return result;
   } catch (error) {
-    console.error("Erreur lors de la création du lobby:", error);
-    return { success: false, lobbyId: "", hostId: "", settings: {} };
+    console.error("❌ Erreur lors de la création du lobby:", error);
+    return {
+      success: false,
+      lobbyId: "",
+      hostId: "",
+      settings: {},
+      message: error instanceof Error ? error.message : "Erreur inconnue",
+    };
   }
 };
 

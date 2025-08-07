@@ -216,31 +216,39 @@ export class WebSocketMessageHandler {
       // Exécuter le handler
       const result = await handler(payload, userId!, socket);
 
-      // Envoyer la réponse de succès
-      sendSuccessResponse(socket, result, `${type}_success`);
+      // Vérifier si le résultat indique un succès ou un échec
+      if (result && result.success === false) {
+        // Envoyer une réponse d'erreur avec plus de détails
+        const errorMessage = result.message || "Opération échouée";
+        console.error(`❌ Erreur dans le handler ${type}:`, errorMessage);
+        sendErrorResponse(socket, errorMessage);
+      } else {
+        // Envoyer la réponse de succès
+        sendSuccessResponse(socket, result, `${type}_success`);
 
-      // Ajout du broadcast après la réponse de succès pour update_player_status
-      if (type === "update_player_status" && payload?.lobbyId) {
-        const lobby = LobbyLifecycleManager.getLobbyInMemory(payload.lobbyId);
-        if (lobby) {
-          await BroadcastManager.broadcastLobbyUpdate(payload.lobbyId, lobby);
+        // Ajout du broadcast après la réponse de succès pour update_player_status
+        if (type === "update_player_status" && payload?.lobbyId) {
+          const lobby = LobbyLifecycleManager.getLobbyInMemory(payload.lobbyId);
+          if (lobby) {
+            await BroadcastManager.broadcastLobbyUpdate(payload.lobbyId, lobby);
+          }
         }
-      }
-      // Ajout du broadcast après la réponse de succès pour join_lobby
-      if (type === "join_lobby" && payload?.lobbyId) {
-        console.log(
-          "🔍 Tentative de broadcast après join_lobby pour lobbyId:",
-          payload.lobbyId
-        );
-        const lobby = LobbyLifecycleManager.getLobbyInMemory(payload.lobbyId);
-        console.log("🔍 Lobby trouvé en mémoire:", lobby ? "oui" : "non");
-        if (lobby) {
-          console.log("🔍 Envoi du broadcastLobbyUpdate");
-          await BroadcastManager.broadcastLobbyUpdate(payload.lobbyId, lobby);
+        // Ajout du broadcast après la réponse de succès pour join_lobby
+        if (type === "join_lobby" && payload?.lobbyId) {
+          console.log(
+            "🔍 Tentative de broadcast après join_lobby pour lobbyId:",
+            payload.lobbyId
+          );
+          const lobby = LobbyLifecycleManager.getLobbyInMemory(payload.lobbyId);
+          console.log("🔍 Lobby trouvé en mémoire:", lobby ? "oui" : "non");
+          if (lobby) {
+            console.log("🔍 Envoi du broadcastLobbyUpdate");
+            await BroadcastManager.broadcastLobbyUpdate(payload.lobbyId, lobby);
+          }
         }
       }
     } catch (error) {
-      console.error(`Erreur lors du traitement du message ${type}:`, error);
+      console.error(`❌ Erreur lors du traitement du message ${type}:`, error);
       const errorMessage =
         error instanceof Error ? error.message : "Erreur inconnue";
       sendErrorResponse(socket, errorMessage);

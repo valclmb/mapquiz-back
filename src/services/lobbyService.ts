@@ -23,13 +23,25 @@ export class LobbyService {
     settings: LobbySettings;
     lobby?: unknown;
     players?: unknown[];
+    message?: string;
   }> {
     try {
+      console.log(`🔍 Vérification de l'utilisateur: ${hostId}`);
+
       // Vérifier que l'utilisateur existe
       const user = await UserModel.findUserById(hostId);
       if (!user) {
-        throw new Error("Utilisateur non trouvé");
+        console.log(`❌ Utilisateur non trouvé: ${hostId}`);
+        return {
+          success: false,
+          lobbyId: "",
+          hostId: "",
+          settings: {},
+          message: "Utilisateur non trouvé",
+        };
       }
+
+      console.log(`✅ Utilisateur trouvé: ${user.name}`);
 
       // Créer le lobby en base de données
       const lobby = await LobbyModel.createLobby(
@@ -37,6 +49,8 @@ export class LobbyService {
         name || `Lobby de ${user.name || hostId}`,
         settings
       );
+
+      console.log(`✅ Lobby créé en base de données: ${lobby.id}`);
 
       return {
         success: true,
@@ -53,8 +67,14 @@ export class LobbyService {
         ],
       };
     } catch (error) {
-      console.error("Erreur lors de la création du lobby:", error);
-      return { success: false, lobbyId: "", hostId: "", settings: {} };
+      console.error("❌ Erreur lors de la création du lobby:", error);
+      return {
+        success: false,
+        lobbyId: "",
+        hostId: "",
+        settings: {},
+        message: error instanceof Error ? error.message : "Erreur inconnue",
+      };
     }
   }
 

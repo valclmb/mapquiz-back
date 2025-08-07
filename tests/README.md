@@ -1,22 +1,43 @@
-# 🧪 Suite de Tests Robuste - MapQuiz Backend
+# 🧪 Suite de Tests Complète - MapQuiz Backend
 
-Cette suite de tests garantit la stabilité et la fiabilité du backend optimisé en évitant les régressions lors des modifications de code.
+Cette suite de tests garantit la stabilité, la fiabilité et les performances du backend optimisé en évitant les régressions lors des modifications de code.
 
 ## 📋 Structure des Tests
 
 ```
 tests/
-├── setup.ts                    # Configuration globale
-├── unit/                       # Tests unitaires
-│   └── services/
-│       ├── lobbyService.test.ts
-│       └── gameService.test.ts
-├── integration/                # Tests d'intégration
-│   └── websocket.test.ts
-├── e2e/                        # Tests end-to-end
-│   └── gameFlow.test.ts
-└── performance/                # Tests de performance
-    └── loadTest.test.ts
+├── setup.ts                           # Configuration globale et utilitaires
+├── jest.d.ts                          # Types Jest
+├── unit/                              # Tests unitaires
+│   ├── controllers/                   # Tests des contrôleurs
+│   │   ├── authController.test.ts     # Tests d'authentification
+│   │   ├── userController.test.ts     # Tests utilisateur
+│   │   ├── lobbyController.test.ts    # Tests de lobby
+│   │   ├── gameController.test.ts     # Tests de jeu
+│   │   └── websocketController.test.ts # Tests WebSocket
+│   ├── services/                      # Tests des services
+│   │   ├── userService.test.ts        # Tests service utilisateur
+│   │   ├── lobbyService.test.ts       # Tests service lobby
+│   │   ├── gameService.test.ts        # Tests service jeu
+│   │   ├── scoreService.test.ts       # Tests service score
+│   │   └── friendService.test.ts      # Tests service ami
+│   ├── middleware/                    # Tests des middlewares
+│   │   └── auth.test.ts               # Tests middleware auth
+│   └── lib/                           # Tests des utilitaires
+│       └── validation.test.ts         # Tests validation
+├── integration/                       # Tests d'intégration
+│   ├── routes/                        # Tests des routes HTTP
+│   │   ├── auth.test.ts               # Tests routes auth
+│   │   ├── users.test.ts              # Tests routes utilisateurs
+│   │   ├── lobbies.test.ts            # Tests routes lobbies
+│   │   ├── games.test.ts              # Tests routes jeux
+│   │   └── scores.test.ts             # Tests routes scores
+│   └── websocket/                     # Tests WebSocket
+│       └── websocket.test.ts          # Tests communication WebSocket
+├── e2e/                               # Tests end-to-end
+│   └── gameFlow.test.ts               # Tests flux de jeu complet
+└── performance/                       # Tests de performance
+    └── loadTest.test.ts               # Tests de charge
 ```
 
 ## 🚀 Commandes de Test
@@ -65,17 +86,17 @@ npm run test:debug
 ### 1. **Tests Unitaires** (`unit/`)
 
 - **Objectif** : Tester les fonctions individuelles
-- **Couverture** : Services, contrôleurs, utilitaires
+- **Couverture** : Services, contrôleurs, utilitaires, middlewares
 - **Exemples** :
   - Création de lobby
-  - Mise à jour de score
   - Validation des données
+  - Authentification
   - Gestion des erreurs
 
 ### 2. **Tests d'Intégration** (`integration/`)
 
 - **Objectif** : Tester les interactions entre composants
-- **Couverture** : WebSocket, API, base de données
+- **Couverture** : Routes HTTP, WebSocket, API, base de données
 - **Exemples** :
   - Connexion WebSocket
   - Création/rejoindre lobby
@@ -106,10 +127,10 @@ npm run test:debug
 
 ### Couverture de Code
 
-- **Minimum** : 80% de couverture globale
-- **Branches** : 80% des branches testées
-- **Fonctions** : 80% des fonctions testées
-- **Lignes** : 80% des lignes exécutées
+- **Minimum** : 90% de couverture globale
+- **Branches** : 85% des branches testées
+- **Fonctions** : 90% des fonctions testées
+- **Lignes** : 90% des lignes exécutées
 
 ### Performance
 
@@ -124,7 +145,7 @@ npm run test:debug
 
 ```bash
 # Base de données de test
-TEST_DATABASE_URL=postgresql://test:test@localhost:5432/mapquiz_test
+TEST_DATABASE_URL=postgresql://test:test@localhost:5433/mapquiz_test
 
 # Configuration des tests
 NODE_ENV=test
@@ -238,11 +259,24 @@ describe("NouveauService", () => {
 ### 2. Test d'Intégration
 
 ```typescript
-// tests/integration/nouveauFeature.test.ts
-describe("Nouveau Feature", () => {
-  it("devrait fonctionner end-to-end", async (done) => {
-    // Test complet avec WebSocket
-    done();
+// tests/integration/routes/nouveauFeature.test.ts
+import { FastifyInstance } from "fastify";
+import { testUtils } from "../../setup.js";
+import { build } from "../../../src/server.js";
+
+describe("Nouveau Feature Integration", () => {
+  let app: FastifyInstance;
+
+  beforeAll(async () => {
+    app = await build();
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  it("devrait fonctionner end-to-end", async () => {
+    // Test complet avec HTTP
   });
 });
 ```
@@ -264,14 +298,29 @@ describe("Performance Nouveau Feature", () => {
 ### Avant Chaque Commit
 
 - [ ] Tests unitaires passent
-- [ ] Couverture > 80%
-- [ ] Aucune régression détectée
+- [ ] Couverture > 90%
+- [ ] Tests d'intégration passent
+- [ ] Tests de performance dans les limites
 
 ### Avant Chaque Release
 
 - [ ] Tous les tests passent
-- [ ] Tests de performance validés
 - [ ] Tests E2E complets
+- [ ] Tests de charge validés
 - [ ] Documentation mise à jour
 
-Cette suite de tests robuste garantit que chaque modification de code maintient la qualité et évite les régressions fonctionnelles.
+## 🔍 Surveillance Continue
+
+### Métriques à Surveiller
+
+- **Temps d'exécution** : < 5 minutes pour tous les tests
+- **Taux de réussite** : > 95%
+- **Couverture** : > 90%
+- **Performance** : Latence < 100ms
+
+### Alertes
+
+- Tests qui échouent
+- Couverture qui baisse
+- Performance qui se dégrade
+- Temps d'exécution qui augmente
