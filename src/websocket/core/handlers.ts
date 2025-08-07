@@ -25,7 +25,14 @@ export const setupWebSocketHandlers = (fastify: FastifyInstance) => {
           const messageString = message.toString();
           // console.log("Message reçu:", messageString);
 
-          const data: WebSocketMessage = JSON.parse(messageString);
+          let data: WebSocketMessage;
+          try {
+            data = JSON.parse(messageString);
+          } catch (parseError) {
+            sendErrorResponse(socket, "Message JSON invalide");
+            return;
+          }
+
           const { type, payload } = data;
 
           // Traitement spécial pour l'authentification
@@ -52,12 +59,18 @@ export const setupWebSocketHandlers = (fastify: FastifyInstance) => {
               return;
             }
             userId = authResult.user.id;
+
+            // Configurer les gestionnaires d'événements de fermeture
+            await WebSocketConnectionHandler.handleAuthentication(
+              socket,
+              authResult.user.id,
+              request
+            );
           }
 
           // Traiter le message
           await WebSocketMessageHandler.handleMessage(data, socket, userId);
         } catch (error) {
-          console.error("Erreur lors du traitement du message:", error);
           const errorMessage =
             error instanceof Error ? error.message : "Erreur inconnue";
           sendErrorResponse(socket, errorMessage);

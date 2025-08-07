@@ -66,7 +66,7 @@ const originalConsoleInfo = console.info;
 const originalConsoleWarn = console.warn;
 
 beforeEach(() => {
-  // Temporairement commenté pour voir les logs de débogage
+  // Supprimer les mocks pour permettre les logs de débogage
   // console.log = jest.fn();
   // console.info = jest.fn();
   // console.warn = jest.fn();
@@ -86,7 +86,9 @@ export const testUtils = {
     id: string = "test-user-id",
     name: string = "Test User"
   ) {
-    const uniqueTag = `TAG${id.slice(-4)}${Date.now()}${Math.random().toString(36).substr(2, 3)}`;
+    const uniqueTag = `TAG${id.slice(-4)}${Date.now()}${Math.random()
+      .toString(36)
+      .substr(2, 3)}`;
     return await prisma.user.upsert({
       where: { id },
       update: { name, tag: uniqueTag },

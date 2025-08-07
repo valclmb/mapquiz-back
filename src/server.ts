@@ -45,11 +45,29 @@ async function setupPlugins() {
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   });
 
-  // Limitation de débit
-  await fastify.register(rateLimit, {
-    max: 100,
-    timeWindow: "1 minute",
-  });
+  // Limitation de débit - Configuration différente selon l'environnement
+  if (process.env.NODE_ENV === "test") {
+    // Configuration très permissive pour les tests
+    await fastify.register(rateLimit, {
+      max: 10000, // Très permissif pour les tests
+      timeWindow: "1 minute",
+      allowList: ["127.0.0.1", "::1", "localhost"],
+      skipOnError: true,
+    });
+  } else if (process.env.NODE_ENV === "production") {
+    // Configuration stricte pour la production
+    await fastify.register(rateLimit, {
+      max: 100,
+      timeWindow: "1 minute",
+    });
+  } else {
+    // Configuration permissive pour le développement
+    await fastify.register(rateLimit, {
+      max: 1000,
+      timeWindow: "1 minute",
+      allowList: ["127.0.0.1", "::1", "localhost"],
+    });
+  }
 
   // Plugin WebSocket
   await fastify.register(websocket);
@@ -61,15 +79,6 @@ async function setupPlugins() {
 export const build = async () => {
   // Configuration des plugins de sécurité et middleware
   await setupPlugins();
-
-  // Appliquer un rate limit très élevé en développement pour éviter les blocages
-  if (process.env.NODE_ENV !== "production") {
-    await fastify.register(rateLimit, {
-      max: 1000, // très permissif pour le dev
-      timeWindow: "1 minute",
-      allowList: ["127.0.0.1", "::1"],
-    });
-  }
 
   // Routes de base
   fastify.get("/", async (request, reply) => {

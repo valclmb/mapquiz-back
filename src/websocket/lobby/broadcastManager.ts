@@ -69,9 +69,9 @@ export class BroadcastManager {
       type: "game_start",
       data: {
         lobbyId,
-        startTime: lobbyData.gameState.startTime,
-        totalQuestions: lobbyData.settings.totalQuestions,
-        settings: lobbyData.gameState.settings,
+        startTime: lobbyData.gameState?.startTime || new Date().toISOString(),
+        totalQuestions: lobbyData.settings?.totalQuestions || 10, // Valeur par défaut
+        settings: lobbyData.gameState?.settings || lobbyData.settings || {},
         gameState: gameStateWithoutCountries,
       },
     };

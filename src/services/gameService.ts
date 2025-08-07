@@ -1,3 +1,4 @@
+import * as LobbyModel from "../models/lobbyModel.js";
 import { BroadcastManager } from "../websocket/lobby/broadcastManager.js";
 import { LobbyLifecycleManager } from "../websocket/lobby/lobbyLifecycle.js";
 import { LobbyService } from "./lobbyService.js";
@@ -13,70 +14,37 @@ export class GameService {
   static async startGame(lobbyId: string): Promise<boolean> {
     const lobby = LobbyLifecycleManager.getLobbyInMemory(lobbyId);
     if (!lobby) {
-      console.log(`Lobby ${lobbyId} non trouvé en mémoire`);
       return false;
     }
 
-    console.log(`Démarrage de la partie pour le lobby ${lobbyId}`);
-
-    // Mettre à jour le statut du lobby
-    lobby.status = "playing";
-
-    // Initialiser l'état du jeu
-    lobby.gameState = {
-      startTime: Date.now(),
-      settings: lobby.settings,
-    };
-
-    // Mettre à jour le statut de tous les joueurs
-    for (const [playerId, playerData] of lobby.players) {
-      lobby.players.set(
-        playerId,
-        PlayerService.updatePlayerStatus(playerData, "playing")
-      );
-    }
-
-    // Mettre à jour le statut du lobby en base de données
     try {
-      await LobbyService.startGame(lobbyId);
-      console.log(`Statut du lobby ${lobbyId} mis à jour en base de données`);
+      // Mettre à jour le statut du lobby en base de données
+      await LobbyModel.updateLobbyStatus(lobbyId, "playing");
+
+      // Créer l'état de jeu
+      const gameState = {
+        startTime: new Date().toISOString(),
+        currentQuestion: 0,
+        totalQuestions: lobby.settings?.totalQuestions || 10,
+        countries: [],
+        currentCountry: null,
+        settings: lobby.settings,
+      };
+
+      // Sauvegarder l'état de jeu en base de données
+      await LobbyModel.saveGameState(lobbyId, gameState);
+
+      // Mettre à jour l'état en mémoire
+      lobby.gameState = gameState;
+      lobby.status = "playing";
+
+      // Diffuser le début de partie
+      BroadcastManager.broadcastGameStart(lobbyId, lobby);
+
+      return true;
     } catch (error) {
-      console.error(
-        `Erreur lors de la mise à jour du statut du lobby ${lobbyId}:`,
-        error
-      );
+      return false;
     }
-
-    // Mettre à jour le statut de tous les joueurs en base de données
-    try {
-      for (const [playerId] of lobby.players) {
-        await LobbyService.updatePlayerStatus(lobbyId, playerId, "playing");
-      }
-    } catch (error) {
-      console.error(
-        `Erreur lors de la mise à jour du statut "playing":`,
-        error
-      );
-    }
-
-    // Sauvegarder l'état du jeu en base de données
-    try {
-      await LobbyService.saveGameState(lobbyId, lobby.gameState);
-      console.log(
-        `État du jeu sauvegardé en base de données pour le lobby ${lobbyId}`
-      );
-    } catch (error) {
-      console.error(
-        `Erreur lors de la sauvegarde de l'état du jeu pour le lobby ${lobbyId}:`,
-        error
-      );
-    }
-
-    // Diffuser le début de la partie
-    BroadcastManager.broadcastGameStart(lobbyId, lobby);
-
-    console.log(`Partie démarrée avec succès pour le lobby ${lobbyId}`);
-    return true;
   }
 
   /**
@@ -123,9 +91,6 @@ export class GameService {
 
     // Vérifier si le joueur a terminé la partie
     if (updatedPlayer.progress >= 100) {
-      console.log(
-        `Joueur ${playerId} a terminé avec ${updatedPlayer.progress}% de progression`
-      );
       this.checkGameCompletion(lobbyId, playerId);
     }
 
@@ -138,50 +103,43 @@ export class GameService {
    */
   static async updatePlayerProgress(
     lobbyId: string,
-    playerId: string,
+    userId: string,
     validatedCountries: string[],
     incorrectCountries: string[],
     score: number,
     totalQuestions: number
   ): Promise<boolean> {
     const lobby = LobbyLifecycleManager.getLobbyInMemory(lobbyId);
-    if (!lobby || !lobby.players.has(playerId)) return false;
+    if (!lobby) {
+      return false;
+    }
 
-    const playerData = lobby.players.get(playerId);
-    const updatedPlayer = PlayerService.updatePlayerProgress(
-      playerData,
-      validatedCountries,
-      incorrectCountries,
-      score,
-      totalQuestions
-    );
+    const player = lobby.players.get(userId);
+    if (!player) {
+      return false;
+    }
 
-    lobby.players.set(playerId, updatedPlayer);
+    // Mettre à jour les données du joueur
+    player.score = score;
+    player.progress =
+      (validatedCountries.length + incorrectCountries.length) / totalQuestions;
+    player.validatedCountries = validatedCountries;
+    player.incorrectCountries = incorrectCountries;
 
-    // Sauvegarder en base de données
+    // Mettre à jour en base de données
     try {
-      await LobbyService.updatePlayerProgress(
+      await LobbyModel.updatePlayerGameData(
         lobbyId,
-        playerId,
-        updatedPlayer.validatedCountries,
-        updatedPlayer.incorrectCountries,
-        updatedPlayer.score,
-        totalQuestions
+        userId,
+        score,
+        player.progress,
+        validatedCountries,
+        incorrectCountries
       );
+      return true;
     } catch (error) {
-      console.error(
-        `Erreur lors de la sauvegarde de la progression en DB pour ${playerId}:`,
-        error
-      );
+      return false;
     }
-
-    // Vérifier si le joueur a terminé la partie
-    if (updatedPlayer.progress >= 100) {
-      this.checkGameCompletion(lobbyId, playerId);
-    }
-
-    BroadcastManager.broadcastPlayerProgressUpdate(lobbyId, lobby);
-    return true;
   }
 
   /**
