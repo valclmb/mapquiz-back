@@ -6,7 +6,6 @@ import {
   handleGetLobbyState,
   handleInviteToLobby,
   handleJoinLobby,
-  handleLeaveGame,
   handleLeaveLobby,
   handleRemovePlayer,
   handleRespondFriendRequest,
@@ -141,13 +140,6 @@ const messageHandlers = new Map<string, MessageHandler>([
     WS_MESSAGE_TYPES.RESTART_GAME,
     async (payload, userId) => {
       return await handleRestartGame(payload, userId);
-    },
-  ],
-
-  [
-    WS_MESSAGE_TYPES.LEAVE_GAME,
-    async (payload, userId) => {
-      return await handleLeaveGame(payload, userId);
     },
   ],
 

@@ -149,7 +149,7 @@ model LobbyPlayer {
   lobby     GameLobby @relation(fields: [lobbyId], references: [id], onDelete: Cascade)
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  status    String   @default("joined") // joined, ready, playing
+  status    String   @default("joined") // joined, ready, playing, disconnected
   score     Int      @default(0)
   progress  Int      @default(0)
   validatedCountries String[] @default([])
