@@ -13,7 +13,6 @@ import {
   handleSendFriendRequest,
   handleSetPlayerReady,
   handleStartGame,
-  handleUpdateGameProgress,
   handleUpdateLobbySettings,
   handleUpdatePlayerProgress,
   handleUpdatePlayerStatus,
@@ -101,13 +100,6 @@ const messageHandlers = new Map<string, MessageHandler>([
   ],
 
   // Handlers pour le jeu
-  [
-    WS_MESSAGE_TYPES.UPDATE_GAME_PROGRESS,
-    async (payload, userId) => {
-      return await handleUpdateGameProgress(payload, userId);
-    },
-  ],
-
   [
     WS_MESSAGE_TYPES.UPDATE_PLAYER_PROGRESS,
     async (payload, userId) => {

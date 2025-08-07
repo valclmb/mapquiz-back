@@ -237,23 +237,6 @@ export const handleStartGame = async (payload: any, userId: string) => {
   return { success };
 };
 
-export const handleUpdateGameProgress = async (
-  payload: any,
-  userId: string
-) => {
-  const { lobbyId, score, progress, answerTime, isConsecutiveCorrect } =
-    payload;
-  const success = await GameService.updatePlayerScore(
-    lobbyId,
-    userId,
-    score,
-    progress,
-    answerTime,
-    isConsecutiveCorrect
-  );
-  return { success };
-};
-
 export const handleUpdatePlayerProgress = async (
   payload: any,
   userId: string
@@ -273,6 +256,16 @@ export const handleUpdatePlayerProgress = async (
     score,
     totalQuestions
   );
+
+  // Diffuser la mise à jour de progression aux autres joueurs
+  if (success) {
+    const lobby = LobbyLifecycleManager.getLobbyInMemory(lobbyId);
+    if (lobby) {
+      // Diffuser la mise à jour de progression
+      await BroadcastManager.broadcastPlayerProgressUpdate(lobbyId, lobby);
+    }
+  }
+
   return { success };
 };
 

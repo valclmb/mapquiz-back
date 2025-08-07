@@ -48,57 +48,6 @@ export class GameService {
   }
 
   /**
-   * Met à jour le score d'un joueur
-   */
-  static async updatePlayerScore(
-    lobbyId: string,
-    playerId: string,
-    score: number,
-    progress: number,
-    answerTime?: number,
-    isConsecutiveCorrect?: boolean
-  ): Promise<boolean> {
-    const lobby = LobbyLifecycleManager.getLobbyInMemory(lobbyId);
-    if (!lobby || !lobby.players.has(playerId)) return false;
-
-    const playerData = lobby.players.get(playerId);
-    const updatedPlayer = PlayerService.updatePlayerScore(
-      playerData,
-      score,
-      progress,
-      answerTime,
-      isConsecutiveCorrect
-    );
-
-    lobby.players.set(playerId, updatedPlayer);
-
-    // Sauvegarder en base de données
-    try {
-      await LobbyService.updatePlayerScore(
-        lobbyId,
-        playerId,
-        updatedPlayer.score,
-        updatedPlayer.progress,
-        updatedPlayer.validatedCountries || [],
-        updatedPlayer.incorrectCountries || []
-      );
-    } catch (error) {
-      console.error(
-        `Erreur lors de la sauvegarde du score en DB pour ${playerId}:`,
-        error
-      );
-    }
-
-    // Vérifier si le joueur a terminé la partie
-    if (updatedPlayer.progress >= 100) {
-      this.checkGameCompletion(lobbyId, playerId);
-    }
-
-    BroadcastManager.broadcastScoreUpdate(lobbyId, lobby, playerId);
-    return true;
-  }
-
-  /**
    * Met à jour la progression détaillée du joueur
    */
   static async updatePlayerProgress(
@@ -107,7 +56,9 @@ export class GameService {
     validatedCountries: string[],
     incorrectCountries: string[],
     score: number,
-    totalQuestions: number
+    totalQuestions: number,
+    answerTime?: number,
+    isConsecutiveCorrect?: boolean
   ): Promise<boolean> {
     const lobby = LobbyLifecycleManager.getLobbyInMemory(lobbyId);
     if (!lobby) {
@@ -122,9 +73,24 @@ export class GameService {
     // Mettre à jour les données du joueur
     player.score = score;
     player.progress =
-      (validatedCountries.length + incorrectCountries.length) / totalQuestions;
+      ((validatedCountries.length + incorrectCountries.length) /
+        totalQuestions) *
+      100;
     player.validatedCountries = validatedCountries;
     player.incorrectCountries = incorrectCountries;
+
+    // Si on a des données supplémentaires (answerTime, isConsecutiveCorrect), les traiter
+    if (answerTime !== undefined || isConsecutiveCorrect !== undefined) {
+      const updatedPlayer = PlayerService.updatePlayerScore(
+        player,
+        score,
+        player.progress,
+        answerTime,
+        isConsecutiveCorrect
+      );
+      // Fusionner les données mises à jour
+      Object.assign(player, updatedPlayer);
+    }
 
     // Mettre à jour en base de données
     try {
@@ -136,10 +102,16 @@ export class GameService {
         validatedCountries,
         incorrectCountries
       );
-      return true;
     } catch (error) {
       return false;
     }
+
+    // Vérifier si le joueur a terminé la partie
+    if (player.progress >= 100) {
+      this.checkGameCompletion(lobbyId, userId);
+    }
+
+    return true;
   }
 
   /**
@@ -157,15 +129,19 @@ export class GameService {
       lobby.players.set(playerId, { ...playerData, status: "finished" });
     }
 
-    // Vérifier si tous les joueurs ont terminé
+    // Vérifier si tous les joueurs ont terminé (progress >= 100)
     let allFinished = true;
     for (const [id, data] of lobby.players.entries()) {
-      if (data.status !== "finished") {
+      if (data.progress < 100) {
         allFinished = false;
+        break;
       }
     }
 
     if (allFinished) {
+      console.log(
+        `🎯 Tous les joueurs ont terminé la partie dans le lobby ${lobbyId}`
+      );
       this.endGame(lobbyId).catch((error) => {
         console.error("Erreur lors de la fin de jeu:", error);
       });

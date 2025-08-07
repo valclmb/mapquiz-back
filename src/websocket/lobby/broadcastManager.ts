@@ -84,23 +84,42 @@ export class BroadcastManager {
   /**
    * Diffuse une mise à jour de progression des joueurs
    */
-  static broadcastPlayerProgressUpdate(lobbyId: string, lobbyData: any): void {
-    const players = Array.from(lobbyData.players.entries()).map(
-      (entry: any) => {
-        const [id, data] = entry;
-        return {
-          id,
-          name: data.name,
-          score: data.score,
-          progress: data.progress,
-          validatedCountries: data.validatedCountries || [],
-          incorrectCountries: data.incorrectCountries || [],
-        };
-      }
-    );
+  static async broadcastPlayerProgressUpdate(
+    lobbyId: string,
+    lobbyData: any
+  ): Promise<void> {
+    // Récupérer tous les joueurs du lobby depuis la base de données pour avoir les noms
+    const allLobbyPlayers = await prisma.lobbyPlayer.findMany({
+      where: { lobbyId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    });
+
+    // Fusionner les données de la base avec celles en mémoire
+    const players = allLobbyPlayers.map((player: any) => {
+      const memoryPlayer = lobbyData.players.get(player.user.id);
+      return {
+        id: player.user.id,
+        name: player.user.name, // Utiliser le nom depuis la base de données
+        score: memoryPlayer ? memoryPlayer.score : player.score || 0,
+        progress: memoryPlayer ? memoryPlayer.progress : player.progress || 0,
+        validatedCountries: memoryPlayer
+          ? memoryPlayer.validatedCountries || []
+          : player.validatedCountries || [],
+        incorrectCountries: memoryPlayer
+          ? memoryPlayer.incorrectCountries || []
+          : player.incorrectCountries || [],
+      };
+    });
 
     const message = {
-      type: "player_progress_update",
+      type: "update_player_progress",
       payload: {
         lobbyId,
         players,
@@ -152,8 +171,8 @@ export class BroadcastManager {
     );
 
     const message = {
-      type: "score_update",
-      data: {
+      type: "update_player_progress",
+      payload: {
         lobbyId,
         players,
         updatedPlayerId,
