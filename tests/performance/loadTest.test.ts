@@ -235,8 +235,11 @@ describe("Performance Load Tests", () => {
 
           ws.on("message", (data) => {
             const response = JSON.parse(data.toString());
-            responses.push(response);
-            resolve();
+            // Attendre spécifiquement le message create_lobby_success
+            if (response.type === "create_lobby_success") {
+              responses.push(response);
+              resolve();
+            }
           });
         });
       });

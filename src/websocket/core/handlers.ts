@@ -16,6 +16,7 @@ export const setupWebSocketHandlers = (fastify: FastifyInstance) => {
   fastify.register(async function (fastify) {
     fastify.get("/ws", { websocket: true }, (socket: WebSocket, request) => {
       let userId: string | null = null;
+      let isAuthenticated = false;
 
       // Gérer la nouvelle connexion
       WebSocketConnectionHandler.handleNewConnection(socket);
@@ -43,6 +44,7 @@ export const setupWebSocketHandlers = (fastify: FastifyInstance) => {
             );
             if (authResult) {
               userId = authResult.user.id;
+              isAuthenticated = true;
               await WebSocketConnectionHandler.handleAuthentication(
                 socket,
                 authResult.user.id,
@@ -52,20 +54,34 @@ export const setupWebSocketHandlers = (fastify: FastifyInstance) => {
             return;
           }
 
-          // Authentification pour les autres messages
-          if (type !== WS_MESSAGE_TYPES.PING) {
+          // Authentification pour les autres messages (seulement si pas déjà authentifié)
+          if (type !== WS_MESSAGE_TYPES.PING && !isAuthenticated) {
             const authResult = await authenticateWebSocketUser(request, socket);
             if (!authResult) {
               return;
             }
             userId = authResult.user.id;
+            isAuthenticated = true;
 
-            // Configurer les gestionnaires d'événements de fermeture
+            // Configurer les gestionnaires d'événements de fermeture (seulement la première fois)
             await WebSocketConnectionHandler.handleAuthentication(
               socket,
               authResult.user.id,
-              request
+              request,
+              false // Ne pas envoyer le message "authenticated" lors des authentifications suivantes
             );
+          } else if (type !== WS_MESSAGE_TYPES.PING && isAuthenticated) {
+            // Si déjà authentifié, juste récupérer l'userId si nécessaire
+            if (!userId) {
+              const authResult = await authenticateWebSocketUser(
+                request,
+                socket
+              );
+              if (!authResult) {
+                return;
+              }
+              userId = authResult.user.id;
+            }
           }
 
           // Traiter le message

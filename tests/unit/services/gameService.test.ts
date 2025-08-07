@@ -1,3 +1,4 @@
+import * as LobbyModel from "../../../src/models/lobbyModel.js";
 import { GameService } from "../../../src/services/gameService.js";
 import { LobbyService } from "../../../src/services/lobbyService.js";
 import { PlayerService } from "../../../src/services/playerService.js";
@@ -9,6 +10,7 @@ jest.mock("../../../src/websocket/lobby/lobbyLifecycle.js");
 jest.mock("../../../src/services/playerService.js");
 jest.mock("../../../src/services/lobbyService.js");
 jest.mock("../../../src/websocket/lobby/broadcastManager.js");
+jest.mock("../../../src/models/lobbyModel.js");
 
 describe("GameService", () => {
   beforeEach(() => {
@@ -33,13 +35,8 @@ describe("GameService", () => {
       (LobbyLifecycleManager.getLobbyInMemory as jest.Mock).mockReturnValue(
         mockLobby
       );
-      (LobbyService.startGame as jest.Mock).mockResolvedValue(true);
-      (LobbyService.updatePlayerStatus as jest.Mock).mockResolvedValue(true);
-      (LobbyService.saveGameState as jest.Mock).mockResolvedValue(true);
-      (PlayerService.updatePlayerStatus as jest.Mock).mockReturnValue({
-        id: "player1",
-        status: "playing",
-      });
+      (LobbyModel.updateLobbyStatus as jest.Mock).mockResolvedValue(true);
+      (LobbyModel.saveGameState as jest.Mock).mockResolvedValue(true);
 
       // Act
       const result = await GameService.startGame(lobbyId);
@@ -48,7 +45,14 @@ describe("GameService", () => {
       expect(result).toBe(true);
       expect(mockLobby.status).toBe("playing");
       expect(mockLobby.gameState).toBeDefined();
-      expect(LobbyService.startGame).toHaveBeenCalledWith(lobbyId);
+      expect(LobbyModel.updateLobbyStatus).toHaveBeenCalledWith(
+        lobbyId,
+        "playing"
+      );
+      expect(LobbyModel.saveGameState).toHaveBeenCalledWith(
+        lobbyId,
+        expect.any(Object)
+      );
       expect(BroadcastManager.broadcastGameStart).toHaveBeenCalledWith(
         lobbyId,
         mockLobby
@@ -68,7 +72,7 @@ describe("GameService", () => {
 
       // Assert
       expect(result).toBe(false);
-      expect(LobbyService.startGame).not.toHaveBeenCalled();
+      expect(LobbyModel.updateLobbyStatus).not.toHaveBeenCalled();
     });
 
     it("devrait gérer les erreurs lors du démarrage", async () => {
@@ -84,60 +88,68 @@ describe("GameService", () => {
       (LobbyLifecycleManager.getLobbyInMemory as jest.Mock).mockReturnValue(
         mockLobby
       );
-      (LobbyService.startGame as jest.Mock).mockRejectedValue(
+      (LobbyModel.updateLobbyStatus as jest.Mock).mockRejectedValue(
         new Error("Start failed")
       );
-      (PlayerService.updatePlayerStatus as jest.Mock).mockReturnValue({
-        id: "player1",
-        status: "playing",
-      });
 
       // Act
       const result = await GameService.startGame(lobbyId);
 
       // Assert
-      expect(result).toBe(true); // Le service continue même si la DB échoue
+      expect(result).toBe(false);
     });
   });
 
-  describe("updatePlayerScore", () => {
-    it("devrait mettre à jour le score d'un joueur avec succès", async () => {
+  describe("updatePlayerProgress", () => {
+    it("devrait mettre à jour le progrès d'un joueur avec succès", async () => {
       // Arrange
       const lobbyId = "test-lobby-id";
       const playerId = "test-player-id";
+      const validatedCountries = ["FRA", "DEU"];
+      const incorrectCountries = ["USA"];
       const score = 100;
-      const progress = 50;
+      const totalQuestions = 10;
 
       const mockLobby = {
         id: lobbyId,
-        players: new Map([[playerId, { id: playerId, score: 0, progress: 0 }]]),
+        players: new Map([
+          [
+            playerId,
+            {
+              id: playerId,
+              score: 0,
+              progress: 0,
+              validatedCountries: [],
+              incorrectCountries: [],
+            },
+          ],
+        ]),
       };
 
       (LobbyLifecycleManager.getLobbyInMemory as jest.Mock).mockReturnValue(
         mockLobby
       );
-      (PlayerService.updatePlayerScore as jest.Mock).mockReturnValue({
-        id: playerId,
-        score,
-        progress,
-      });
+      (LobbyModel.updatePlayerGameData as jest.Mock).mockResolvedValue(true);
 
       // Act
-      const result = await GameService.updatePlayerScore(
+      const result = await GameService.updatePlayerProgress(
         lobbyId,
         playerId,
+        validatedCountries,
+        incorrectCountries,
         score,
-        progress
+        totalQuestions
       );
 
       // Assert
       expect(result).toBe(true);
-      expect(PlayerService.updatePlayerScore).toHaveBeenCalledWith(
-        { id: playerId, score: 0, progress: 0 },
-        score,
-        progress,
-        undefined,
-        undefined
+      expect(mockLobby.players.get(playerId)?.score).toBe(score);
+      expect(mockLobby.players.get(playerId)?.progress).toBe(30); // (2+1)/10 * 100
+      expect(mockLobby.players.get(playerId)?.validatedCountries).toEqual(
+        validatedCountries
+      );
+      expect(mockLobby.players.get(playerId)?.incorrectCountries).toEqual(
+        incorrectCountries
       );
     });
 
@@ -151,11 +163,13 @@ describe("GameService", () => {
       );
 
       // Act
-      const result = await GameService.updatePlayerScore(
+      const result = await GameService.updatePlayerProgress(
         lobbyId,
         playerId,
+        ["FRA"],
+        [],
         100,
-        50
+        10
       );
 
       // Assert
@@ -179,118 +193,17 @@ describe("GameService", () => {
       );
 
       // Act
-      const result = await GameService.updatePlayerScore(
+      const result = await GameService.updatePlayerProgress(
         lobbyId,
         playerId,
+        ["FRA"],
+        [],
         100,
-        50
+        10
       );
 
       // Assert
       expect(result).toBe(false);
-    });
-  });
-
-  describe("updatePlayerProgress", () => {
-    it("devrait mettre à jour le progrès d'un joueur avec succès", async () => {
-      // Arrange
-      const lobbyId = "test-lobby-id";
-      const playerId = "test-player-id";
-      const validatedCountries = ["FRA", "DEU"];
-      const incorrectCountries = ["USA"];
-      const score = 100;
-      const totalQuestions = 10;
-
-      const mockLobby = {
-        id: lobbyId,
-        players: new Map([[playerId, { id: playerId, score: 0, progress: 0 }]]),
-      };
-
-      const updatedPlayer = {
-        id: playerId,
-        score,
-        progress: 50,
-        validatedCountries,
-        incorrectCountries,
-      };
-
-      (LobbyLifecycleManager.getLobbyInMemory as jest.Mock).mockReturnValue(
-        mockLobby
-      );
-      (PlayerService.updatePlayerProgress as jest.Mock).mockReturnValue(
-        updatedPlayer
-      );
-      (LobbyService.updatePlayerProgress as jest.Mock).mockResolvedValue(true);
-
-      // Act
-      const result = await GameService.updatePlayerProgress(
-        lobbyId,
-        playerId,
-        validatedCountries,
-        incorrectCountries,
-        score,
-        totalQuestions
-      );
-
-      // Assert
-      expect(result).toBe(true);
-      expect(PlayerService.updatePlayerProgress).toHaveBeenCalledWith(
-        { id: playerId, score: 0, progress: 0 },
-        validatedCountries,
-        incorrectCountries,
-        score,
-        totalQuestions
-      );
-      expect(LobbyService.updatePlayerProgress).toHaveBeenCalledWith(
-        lobbyId,
-        playerId,
-        validatedCountries,
-        incorrectCountries,
-        score,
-        totalQuestions
-      );
-    });
-
-    it("devrait gérer les erreurs lors de la mise à jour", async () => {
-      // Arrange
-      const lobbyId = "test-lobby-id";
-      const playerId = "test-player-id";
-
-      const mockLobby = {
-        id: lobbyId,
-        players: new Map([[playerId, { id: playerId, score: 0, progress: 0 }]]),
-      };
-
-      const updatedPlayer = {
-        id: playerId,
-        score: 0,
-        progress: 0,
-        validatedCountries: [],
-        incorrectCountries: [],
-      };
-
-      (LobbyLifecycleManager.getLobbyInMemory as jest.Mock).mockReturnValue(
-        mockLobby
-      );
-      (PlayerService.updatePlayerProgress as jest.Mock).mockReturnValue(
-        updatedPlayer
-      );
-      (LobbyService.updatePlayerProgress as jest.Mock).mockRejectedValue(
-        new Error("Update failed")
-      );
-
-      // Act
-      const result = await GameService.updatePlayerProgress(
-        lobbyId,
-        playerId,
-        [],
-        [],
-        0,
-        0
-      );
-
-      // Assert
-      expect(result).toBe(true); // Le service continue même si la DB échoue
     });
   });
 

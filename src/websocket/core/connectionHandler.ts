@@ -33,7 +33,8 @@ export class WebSocketConnectionHandler {
   static async handleAuthentication(
     socket: WebSocket,
     userId: string,
-    request: any
+    request: any,
+    sendAuthenticatedMessage: boolean = true
   ): Promise<void> {
     // Ajouter la connexion au gestionnaire
     addConnection(userId, socket);
@@ -47,14 +48,16 @@ export class WebSocketConnectionHandler {
     // Configurer les gestionnaires d'événements de fermeture
     this.setupConnectionEventHandlers(socket, userId);
 
-    // Envoyer la confirmation d'authentification
-    sendSuccessResponse(
-      socket,
-      {
-        userId: userId,
-      },
-      "authenticated"
-    );
+    // Envoyer la confirmation d'authentification seulement si demandé
+    if (sendAuthenticatedMessage) {
+      sendSuccessResponse(
+        socket,
+        {
+          userId: userId,
+        },
+        "authenticated"
+      );
+    }
   }
 
   /**

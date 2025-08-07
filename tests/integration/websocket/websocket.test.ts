@@ -417,6 +417,7 @@ describe("WebSocket Integration Tests", () => {
           // Accepter soit le succès soit une erreur (si le lobby n'est pas configuré correctement)
           if (
             response.type === "start_game_success" ||
+            response.type === "game_start" ||
             response.type === "error"
           ) {
             expect(response.type).toBeDefined();
