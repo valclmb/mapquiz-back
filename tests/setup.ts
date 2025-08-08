@@ -64,12 +64,15 @@ jest.setTimeout(30000); // 30 secondes par test
 const originalConsoleLog = console.log;
 const originalConsoleInfo = console.info;
 const originalConsoleWarn = console.warn;
+const originalConsoleError = console.error;
 
 beforeEach(() => {
   // Supprimer les mocks pour permettre les logs de débogage
   // console.log = jest.fn();
   // console.info = jest.fn();
   // console.warn = jest.fn();
+  // Mock console.error pour éviter la pollution des tests
+  console.error = jest.fn();
 });
 
 afterEach(() => {
@@ -77,6 +80,8 @@ afterEach(() => {
   // console.log = originalConsoleLog;
   // console.info = originalConsoleInfo;
   // console.warn = originalConsoleWarn;
+  // Restaurer console.error
+  console.error = originalConsoleError;
 });
 
 // Utilitaires pour les tests

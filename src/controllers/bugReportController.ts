@@ -67,7 +67,7 @@ export class BugReportController {
         return reply.status(400).send({
           success: false,
           message: "Données invalides",
-          errors: (error as any).errors,
+          errors: error.issues,
         });
       }
       throw error;

@@ -206,5 +206,136 @@ describe("AuthController", () => {
         })
       );
     });
+
+    // Nouveaux tests pour couvrir les lignes manquantes
+    it("devrait gérer les headers avec valeurs null ou undefined", async () => {
+      // Arrange
+      const requestWithNullHeaders = {
+        ...mockRequest,
+        headers: {
+          host: "localhost:3000",
+          "user-agent": null as any,
+          "content-type": undefined as any,
+          authorization: "",
+        },
+      };
+
+      const mockResponse = {
+        status: 200,
+        headers: new Headers(),
+        text: jest.fn().mockResolvedValue('{"success": true}'),
+      };
+
+      const { auth } = await import("../../../src/lib/auth.js");
+      (auth.handler as jest.Mock).mockResolvedValue(mockResponse);
+
+      // Act
+      await handleAuth(
+        requestWithNullHeaders as FastifyRequest,
+        mockReply as FastifyReply
+      );
+
+      // Assert
+      expect(auth.handler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          method: "GET",
+          url: "http://localhost:3000/auth/google",
+        })
+      );
+    });
+
+    it("devrait gérer les headers avec valeurs vides", async () => {
+      // Arrange
+      const requestWithEmptyHeaders = {
+        ...mockRequest,
+        headers: {
+          host: "localhost:3000",
+          "user-agent": "   ",
+          "content-type": "",
+          authorization: null as any,
+        },
+      };
+
+      const mockResponse = {
+        status: 200,
+        headers: new Headers(),
+        text: jest.fn().mockResolvedValue('{"success": true}'),
+      };
+
+      const { auth } = await import("../../../src/lib/auth.js");
+      (auth.handler as jest.Mock).mockResolvedValue(mockResponse);
+
+      // Act
+      await handleAuth(
+        requestWithEmptyHeaders as FastifyRequest,
+        mockReply as FastifyReply
+      );
+
+      // Assert
+      expect(auth.handler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          method: "GET",
+          url: "http://localhost:3000/auth/google",
+        })
+      );
+    });
+
+    it("devrait gérer les erreurs d'authentification avec console.error", async () => {
+      // Arrange
+      const consoleSpy = jest.spyOn(console, "error").mockImplementation();
+      const { auth } = await import("../../../src/lib/auth.js");
+      (auth.handler as jest.Mock).mockRejectedValue(new Error("Auth failed"));
+
+      // Act
+      await handleAuth(
+        mockRequest as FastifyRequest,
+        mockReply as FastifyReply
+      );
+
+      // Assert
+      expect(mockReply.status).toHaveBeenCalledWith(500);
+      expect(mockReply.send).toHaveBeenCalledWith({
+        error: "Internal authentication error",
+        code: "AUTH_FAILURE",
+      });
+      expect(mockRequest.log?.error).toHaveBeenCalledWith(
+        "Authentication Error:",
+        expect.any(Error)
+      );
+      consoleSpy.mockRestore();
+    });
+
+    it("devrait gérer une requête sans host header", async () => {
+      // Arrange
+      const requestWithoutHost = {
+        ...mockRequest,
+        headers: {
+          "user-agent": "test-agent",
+        },
+      };
+
+      const mockResponse = {
+        status: 200,
+        headers: new Headers(),
+        text: jest.fn().mockResolvedValue('{"success": true}'),
+      };
+
+      const { auth } = await import("../../../src/lib/auth.js");
+      (auth.handler as jest.Mock).mockResolvedValue(mockResponse);
+
+      // Act
+      await handleAuth(
+        requestWithoutHost as FastifyRequest,
+        mockReply as FastifyReply
+      );
+
+      // Assert
+      expect(auth.handler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          method: "GET",
+          url: "http://undefined/auth/google",
+        })
+      );
+    });
   });
 });

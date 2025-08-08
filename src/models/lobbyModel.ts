@@ -286,12 +286,13 @@ export const addAuthorizedPlayer = async (lobbyId: string, userId: string) => {
   const authorizedPlayers = lobby.authorizedPlayers || [];
   if (!authorizedPlayers.includes(userId)) {
     authorizedPlayers.push(userId);
+    return await prisma.gameLobby.update({
+      where: { id: lobbyId },
+      data: { authorizedPlayers },
+    });
   }
 
-  return await prisma.gameLobby.update({
-    where: { id: lobbyId },
-    data: { authorizedPlayers },
-  });
+  return lobby;
 };
 
 /**

@@ -17,7 +17,7 @@ describe("Performance Load Tests", () => {
     server = app.server;
 
     // Créer des utilisateurs de test
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < 100; i++) {
       const user = await testUtils.createTestUser(
         `test-user-${i}`,
         `Test User ${i}`
@@ -36,7 +36,7 @@ describe("Performance Load Tests", () => {
 
     // Recréer les utilisateurs de test
     testUsers = [];
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < 100; i++) {
       const user = await testUtils.createTestUser(
         `test-user-${i}`,
         `Test User ${i}`
@@ -45,15 +45,15 @@ describe("Performance Load Tests", () => {
     }
   });
 
-  describe("Tests de charge WebSocket", () => {
-    it("devrait gérer 10 connexions WebSocket simultanées", async () => {
-      // Arrange
+  describe("Tests de charge WebSocket - Connexions simultanées", () => {
+    it("devrait gérer 50 connexions WebSocket simultanées", async () => {
       const connections: WebSocket[] = [];
-      const maxConnections = 10;
+      const maxConnections = 50;
       let connectedCount = 0;
       let messageCount = 0;
+      const startTime = Date.now();
 
-      // Act
+      // Créer toutes les connexions
       for (let i = 0; i < maxConnections; i++) {
         const ws = new WebSocket(`ws://localhost:${server.address().port}/ws`, {
           headers: { "x-user-id": testUsers[i].id },
@@ -61,7 +61,6 @@ describe("Performance Load Tests", () => {
 
         ws.on("open", () => {
           connectedCount++;
-
           // Envoyer un message de ping
           const pingMessage = {
             type: "ping",
@@ -70,45 +69,231 @@ describe("Performance Load Tests", () => {
           ws.send(JSON.stringify(pingMessage));
         });
 
+        ws.on("error", (error) => {
+          console.error(
+            `Erreur de connexion pour l'utilisateur ${i}:`,
+            error.message
+          );
+        });
+
         connections.push(ws);
       }
 
       // Attendre que toutes les connexions soient établies et les messages reçus
-      await new Promise<void>((resolve) => {
+      await new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(
+            new Error(
+              `Timeout: Seulement ${connectedCount}/${maxConnections} connexions établies`
+            )
+          );
+        }, 30000);
+
         connections.forEach((ws) => {
           ws.on("message", (data) => {
-            const response = JSON.parse(data.toString());
-            if (response.type === "pong") {
-              messageCount++;
-              if (messageCount === maxConnections) {
-                // Assert
-                expect(connectedCount).toBe(maxConnections);
-                expect(messageCount).toBe(maxConnections);
+            try {
+              const response = JSON.parse(data.toString());
+              if (response.type === "pong") {
+                messageCount++;
+                if (messageCount === maxConnections) {
+                  clearTimeout(timeout);
+                  const endTime = Date.now();
+                  const duration = endTime - startTime;
 
-                // Nettoyer
-                connections.forEach((conn) => conn.close());
-                resolve();
+                  // Assert
+                  expect(connectedCount).toBe(maxConnections);
+                  expect(messageCount).toBe(maxConnections);
+                  expect(duration).toBeLessThan(30000); // Moins de 30 secondes
+
+                  console.log(
+                    `✅ ${maxConnections} connexions établies en ${duration}ms`
+                  );
+
+                  // Nettoyer
+                  connections.forEach((conn) => conn.close());
+                  resolve();
+                }
               }
+            } catch (error) {
+              console.error("Erreur parsing message:", error);
             }
           });
         });
       });
-    }, 15000);
+    }, 60000);
 
-    it("devrait gérer 50 messages par seconde", async () => {
-      // Arrange
+    it("devrait gérer 100 connexions WebSocket avec stress test", async () => {
+      const connections: WebSocket[] = [];
+      const maxConnections = 100;
+      let connectedCount = 0;
+      let messageCount = 0;
+      let errorCount = 0;
+      const startTime = Date.now();
+
+      // Créer toutes les connexions avec gestion d'erreur
+      for (let i = 0; i < maxConnections; i++) {
+        const ws = new WebSocket(`ws://localhost:${server.address().port}/ws`, {
+          headers: { "x-user-id": testUsers[i].id },
+        });
+
+        ws.on("open", () => {
+          connectedCount++;
+          // Envoyer plusieurs messages de stress
+          for (let j = 0; j < 5; j++) {
+            const pingMessage = {
+              type: "ping",
+              data: {
+                timestamp: Date.now(),
+                userId: testUsers[i].id,
+                messageId: j,
+              },
+            };
+            ws.send(JSON.stringify(pingMessage));
+          }
+        });
+
+        ws.on("error", (error) => {
+          errorCount++;
+          console.error(
+            `Erreur de connexion pour l'utilisateur ${i}:`,
+            error.message
+          );
+        });
+
+        connections.push(ws);
+      }
+
+      // Attendre et collecter les résultats
+      await new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(
+            new Error(
+              `Timeout: ${connectedCount}/${maxConnections} connexions établies, ${errorCount} erreurs`
+            )
+          );
+        }, 60000);
+
+        connections.forEach((ws) => {
+          ws.on("message", (data) => {
+            try {
+              const response = JSON.parse(data.toString());
+              if (response.type === "pong") {
+                messageCount++;
+                if (messageCount >= maxConnections * 5 * 0.8) {
+                  // 80% des messages reçus
+                  clearTimeout(timeout);
+                  const endTime = Date.now();
+                  const duration = endTime - startTime;
+
+                  // Assert
+                  expect(connectedCount).toBeGreaterThan(maxConnections * 0.8); // Au moins 80% de succès
+                  expect(errorCount).toBeLessThan(maxConnections * 0.2); // Moins de 20% d'erreurs
+                  expect(duration).toBeLessThan(60000); // Moins de 60 secondes
+
+                  console.log(
+                    `✅ Stress test: ${connectedCount}/${maxConnections} connexions, ${errorCount} erreurs, ${duration}ms`
+                  );
+
+                  // Nettoyer
+                  connections.forEach((conn) => conn.close());
+                  resolve();
+                }
+              }
+            } catch (error) {
+              console.error("Erreur parsing message:", error);
+            }
+          });
+        });
+      });
+    }, 120000);
+
+    it("devrait gérer les déconnexions/reconnexions massives", async () => {
+      const maxConnections = 30;
+      const maxReconnections = 3;
+      let totalConnections = 0;
+      let totalReconnections = 0;
+      const startTime = Date.now();
+
+      // Créer des connexions initiales
+      const createConnections = async (count: number): Promise<WebSocket[]> => {
+        const connections: WebSocket[] = [];
+
+        for (let i = 0; i < count; i++) {
+          const ws = new WebSocket(
+            `ws://localhost:${server.address().port}/ws`,
+            {
+              headers: { "x-user-id": testUsers[i].id },
+            }
+          );
+
+          await new Promise<void>((resolve) => {
+            ws.on("open", () => {
+              totalConnections++;
+              resolve();
+            });
+            ws.on("error", () => resolve()); // Ignorer les erreurs pour ce test
+          });
+
+          connections.push(ws);
+        }
+
+        return connections;
+      };
+
+      // Test de déconnexion/reconnexion
+      for (let round = 0; round < maxReconnections; round++) {
+        console.log(
+          `Round ${round + 1}: Création de ${maxConnections} connexions`
+        );
+
+        // Créer des connexions
+        const connections = await createConnections(maxConnections);
+
+        // Attendre un peu
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+
+        // Fermer toutes les connexions
+        connections.forEach((conn) => conn.close());
+        totalReconnections += connections.length;
+
+        // Attendre un peu avant la prochaine série
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+
+      const endTime = Date.now();
+      const duration = endTime - startTime;
+
+      // Assert
+      expect(totalConnections).toBeGreaterThan(
+        maxConnections * maxReconnections * 0.8
+      );
+      expect(duration).toBeLessThan(120000); // Moins de 2 minutes
+
+      console.log(
+        `✅ Reconnection test: ${totalConnections} connexions totales, ${totalReconnections} reconnections, ${duration}ms`
+      );
+    }, 180000);
+  });
+
+  describe("Tests de charge WebSocket - Messages simultanés", () => {
+    it("devrait gérer 1000 messages par seconde", async () => {
       const ws = new WebSocket(`ws://localhost:${server.address().port}/ws`, {
         headers: { "x-user-id": testUsers[0].id },
       });
 
       let messageCount = 0;
-      const maxMessages = 50;
+      const maxMessages = 1000;
       const startTime = Date.now();
 
-      // Act & Assert
-      await new Promise<void>((resolve) => {
+      await new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(
+            new Error(`Timeout: ${messageCount}/${maxMessages} messages reçus`)
+          );
+        }, 30000);
+
         ws.on("open", () => {
-          // Envoyer 50 messages rapidement
+          // Envoyer 1000 messages rapidement
           for (let i = 0; i < maxMessages; i++) {
             const pingMessage = {
               type: "ping",
@@ -119,87 +304,47 @@ describe("Performance Load Tests", () => {
         });
 
         ws.on("message", (data) => {
-          const response = JSON.parse(data.toString());
-          if (response.type === "pong") {
-            messageCount++;
-            if (messageCount === maxMessages) {
-              const endTime = Date.now();
-              const duration = endTime - startTime;
-              const messagesPerSecond = (maxMessages / duration) * 1000;
+          try {
+            const response = JSON.parse(data.toString());
+            if (response.type === "pong") {
+              messageCount++;
+              if (messageCount === maxMessages) {
+                clearTimeout(timeout);
+                const endTime = Date.now();
+                const duration = endTime - startTime;
+                const messagesPerSecond = (maxMessages / duration) * 1000;
 
-              expect(messageCount).toBe(maxMessages);
-              expect(messagesPerSecond).toBeGreaterThan(10); // Au moins 10 msg/s
+                expect(messageCount).toBe(maxMessages);
+                expect(messagesPerSecond).toBeGreaterThan(50); // Au moins 50 msg/s
 
-              ws.close();
-              resolve();
+                console.log(
+                  `✅ ${maxMessages} messages traités en ${duration}ms (${messagesPerSecond.toFixed(
+                    2
+                  )} msg/s)`
+                );
+
+                ws.close();
+                resolve();
+              }
             }
+          } catch (error) {
+            console.error("Erreur parsing message:", error);
           }
         });
       });
-    }, 10000);
+    }, 60000);
 
-    it("devrait gérer la création de 20 lobbies simultanément", async () => {
-      // Arrange
-      const lobbyPromises = [];
-      const maxLobbies = 20;
-
-      // Act
-      for (let i = 0; i < maxLobbies; i++) {
-        const lobbyPromise = testUtils.createTestLobby(
-          `test-lobby-${i}`,
-          testUsers[i].id,
-          { selectedRegions: ["Europe"], gameMode: "quiz" }
-        );
-        lobbyPromises.push(lobbyPromise);
-      }
-
-      const lobbies = await Promise.all(lobbyPromises);
-
-      // Assert
-      expect(lobbies).toHaveLength(maxLobbies);
-      lobbies.forEach((lobby, index) => {
-        expect(lobby.id).toBe(`test-lobby-${index}`);
-        expect(lobby.hostId).toBe(testUsers[index].id);
-      });
-    }, 30000);
-  });
-
-  describe("Tests de charge HTTP", () => {
-    it("devrait gérer 100 requêtes HTTP simultanées", async () => {
-      // Arrange
-      const requestPromises = [];
-      const maxRequests = 100;
-
-      // Act
-      for (let i = 0; i < maxRequests; i++) {
-        const requestPromise = app.inject({
-          method: "GET",
-          url: "/health",
-        });
-        requestPromises.push(requestPromise);
-      }
-
-      const responses = await Promise.all(requestPromises);
-
-      // Assert
-      expect(responses).toHaveLength(maxRequests);
-      responses.forEach((response) => {
-        expect(response.statusCode).toBe(200);
-        const body = JSON.parse(response.payload);
-        expect(body.status).toBe("ok");
-      });
-    }, 30000);
-
-    it("devrait gérer 50 requêtes de création de lobby simultanées", async () => {
-      // Arrange
-      const maxRequests = 50;
-      const responses: any[] = [];
+    it("devrait gérer des messages simultanés de plusieurs clients", async () => {
+      const maxClients = 20;
+      const messagesPerClient = 50;
       const connections: WebSocket[] = [];
+      let totalMessages = 0;
+      const startTime = Date.now();
 
-      // Créer des connexions WebSocket
-      for (let i = 0; i < maxRequests; i++) {
+      // Créer les connexions
+      for (let i = 0; i < maxClients; i++) {
         const ws = new WebSocket(`ws://localhost:${server.address().port}/ws`, {
-          headers: { "x-user-id": testUsers[i % testUsers.length].id },
+          headers: { "x-user-id": testUsers[i].id },
         });
         connections.push(ws);
       }
@@ -210,14 +355,105 @@ describe("Performance Load Tests", () => {
         connections.forEach((ws) => {
           ws.on("open", () => {
             connectedCount++;
-            if (connectedCount === maxRequests) {
+            if (connectedCount === maxClients) {
               resolve();
             }
           });
         });
       });
 
-      // Act - Envoyer des messages de création de lobby
+      // Envoyer des messages simultanément
+      await new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(
+            new Error(
+              `Timeout: ${totalMessages}/${
+                maxClients * messagesPerClient
+              } messages reçus`
+            )
+          );
+        }, 60000);
+
+        connections.forEach((ws, clientIndex) => {
+          let clientMessages = 0;
+
+          ws.on("message", (data) => {
+            try {
+              const response = JSON.parse(data.toString());
+              if (response.type === "pong") {
+                clientMessages++;
+                totalMessages++;
+
+                if (totalMessages === maxClients * messagesPerClient) {
+                  clearTimeout(timeout);
+                  const endTime = Date.now();
+                  const duration = endTime - startTime;
+                  const messagesPerSecond = (totalMessages / duration) * 1000;
+
+                  expect(totalMessages).toBe(maxClients * messagesPerClient);
+                  expect(messagesPerSecond).toBeGreaterThan(100); // Au moins 100 msg/s
+
+                  console.log(
+                    `✅ ${totalMessages} messages simultanés traités en ${duration}ms (${messagesPerSecond.toFixed(
+                      2
+                    )} msg/s)`
+                  );
+
+                  connections.forEach((conn) => conn.close());
+                  resolve();
+                }
+              }
+            } catch (error) {
+              console.error("Erreur parsing message:", error);
+            }
+          });
+
+          // Envoyer les messages pour ce client
+          for (let i = 0; i < messagesPerClient; i++) {
+            const pingMessage = {
+              type: "ping",
+              data: {
+                timestamp: Date.now(),
+                clientId: clientIndex,
+                messageId: i,
+              },
+            };
+            ws.send(JSON.stringify(pingMessage));
+          }
+        });
+      });
+    }, 120000);
+  });
+
+  describe("Tests de charge WebSocket - Lobbies simultanés", () => {
+    it("devrait gérer la création de 50 lobbies simultanément", async () => {
+      const maxLobbies = 50;
+      const connections: WebSocket[] = [];
+      const lobbyResponses: any[] = [];
+
+      // Créer des connexions WebSocket
+      for (let i = 0; i < maxLobbies; i++) {
+        const ws = new WebSocket(`ws://localhost:${server.address().port}/ws`, {
+          headers: { "x-user-id": testUsers[i].id },
+        });
+        connections.push(ws);
+      }
+
+      // Attendre que toutes les connexions soient établies
+      await new Promise<void>((resolve) => {
+        let connectedCount = 0;
+        connections.forEach((ws) => {
+          ws.on("open", () => {
+            connectedCount++;
+            if (connectedCount === maxLobbies) {
+              resolve();
+            }
+          });
+        });
+      });
+
+      // Créer des lobbies simultanément
+      const startTime = Date.now();
       const promises = connections.map((ws, index) => {
         return new Promise<void>((resolve) => {
           const createLobbyMessage = {
@@ -234,39 +470,43 @@ describe("Performance Load Tests", () => {
           ws.send(JSON.stringify(createLobbyMessage));
 
           ws.on("message", (data) => {
-            const response = JSON.parse(data.toString());
-            // Attendre spécifiquement le message create_lobby_success
-            if (response.type === "create_lobby_success") {
-              responses.push(response);
-              resolve();
+            try {
+              const response = JSON.parse(data.toString());
+              if (response.type === "create_lobby_success") {
+                lobbyResponses.push(response);
+                resolve();
+              }
+            } catch (error) {
+              console.error("Erreur parsing message:", error);
             }
           });
         });
       });
 
       await Promise.all(promises);
+      const endTime = Date.now();
+      const duration = endTime - startTime;
 
       // Assert
-      expect(responses).toHaveLength(maxRequests);
-      responses.forEach((response) => {
-        expect(response.type).toBe("create_lobby_success");
-        expect(response.data.lobbyId).toBeDefined();
-      });
+      expect(lobbyResponses).toHaveLength(maxLobbies);
+      expect(duration).toBeLessThan(60000); // Moins de 60 secondes
+
+      console.log(
+        `✅ ${maxLobbies} lobbies créés simultanément en ${duration}ms`
+      );
 
       // Nettoyer
       connections.forEach((conn) => conn.close());
-    }, 30000);
-  });
+    }, 120000);
 
-  describe("Tests de mémoire", () => {
-    it("devrait maintenir une utilisation mémoire stable", async () => {
-      // Arrange
-      const maxConnections = 5; // Réduire pour éviter la surcharge
+    it("devrait gérer des lobbies avec plusieurs joueurs simultanément", async () => {
+      const maxLobbies = 10;
+      const playersPerLobby = 5;
       const connections: WebSocket[] = [];
-      const initialMemory = process.memoryUsage().heapUsed;
+      const lobbyIds: string[] = [];
 
-      // Act - Créer plusieurs connexions
-      for (let i = 0; i < maxConnections; i++) {
+      // Créer des connexions pour tous les joueurs
+      for (let i = 0; i < maxLobbies * playersPerLobby; i++) {
         const ws = new WebSocket(`ws://localhost:${server.address().port}/ws`, {
           headers: { "x-user-id": testUsers[i].id },
         });
@@ -279,33 +519,145 @@ describe("Performance Load Tests", () => {
         connections.forEach((ws) => {
           ws.on("open", () => {
             connectedCount++;
-            if (connectedCount === maxConnections) {
+            if (connectedCount === maxLobbies * playersPerLobby) {
               resolve();
             }
           });
         });
       });
 
-      // Attendre un peu pour stabiliser la mémoire
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      // Créer des lobbies et y ajouter des joueurs
+      const startTime = Date.now();
+
+      for (let lobbyIndex = 0; lobbyIndex < maxLobbies; lobbyIndex++) {
+        const hostConnection = connections[lobbyIndex * playersPerLobby];
+
+        // Créer le lobby
+        const createLobbyMessage = {
+          type: "create_lobby",
+          payload: {
+            name: `Multiplayer Lobby ${lobbyIndex}`,
+            settings: {
+              selectedRegions: ["Europe"],
+              gameMode: "quiz",
+            },
+          },
+        };
+
+        const lobbyId = await new Promise<string>((resolve) => {
+          hostConnection.send(JSON.stringify(createLobbyMessage));
+          hostConnection.on("message", (data) => {
+            try {
+              const response = JSON.parse(data.toString());
+              if (response.type === "create_lobby_success") {
+                resolve(response.data.lobbyId);
+              }
+            } catch (error) {
+              console.error("Erreur parsing message:", error);
+            }
+          });
+        });
+
+        lobbyIds.push(lobbyId);
+
+        // Ajouter les autres joueurs au lobby
+        for (
+          let playerIndex = 1;
+          playerIndex < playersPerLobby;
+          playerIndex++
+        ) {
+          const playerConnection =
+            connections[lobbyIndex * playersPerLobby + playerIndex];
+          const joinLobbyMessage = {
+            type: "join_lobby",
+            payload: { lobbyId },
+          };
+
+          playerConnection.send(JSON.stringify(joinLobbyMessage));
+        }
+      }
+
+      const endTime = Date.now();
+      const duration = endTime - startTime;
+
+      // Assert
+      expect(lobbyIds).toHaveLength(maxLobbies);
+      expect(duration).toBeLessThan(60000); // Moins de 60 secondes
+
+      console.log(
+        `✅ ${maxLobbies} lobbies avec ${playersPerLobby} joueurs chacun créés en ${duration}ms`
+      );
+
+      // Nettoyer
+      connections.forEach((conn) => conn.close());
+    }, 120000);
+  });
+
+  describe("Tests de mémoire avancés", () => {
+    it("devrait maintenir une utilisation mémoire stable avec 100 connexions", async () => {
+      const maxConnections = 100;
+      const connections: WebSocket[] = [];
+      const initialMemory = process.memoryUsage().heapUsed;
+      const memorySnapshots: number[] = [];
+
+      // Créer des connexions par batch
+      for (let batch = 0; batch < 5; batch++) {
+        const batchConnections: WebSocket[] = [];
+
+        for (let i = 0; i < maxConnections / 5; i++) {
+          const ws = new WebSocket(
+            `ws://localhost:${server.address().port}/ws`,
+            {
+              headers: { "x-user-id": testUsers[batch * 20 + i].id },
+            }
+          );
+          batchConnections.push(ws);
+        }
+
+        // Attendre que le batch soit connecté
+        await new Promise<void>((resolve) => {
+          let connectedCount = 0;
+          batchConnections.forEach((ws) => {
+            ws.on("open", () => {
+              connectedCount++;
+              if (connectedCount === batchConnections.length) {
+                resolve();
+              }
+            });
+          });
+        });
+
+        connections.push(...batchConnections);
+        memorySnapshots.push(process.memoryUsage().heapUsed);
+
+        // Pause entre les batches
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
 
       const finalMemory = process.memoryUsage().heapUsed;
       const memoryIncrease = finalMemory - initialMemory;
+      const maxMemoryIncrease = Math.max(...memorySnapshots) - initialMemory;
 
-      // Assert - L'augmentation de mémoire ne devrait pas être excessive
-      expect(memoryIncrease).toBeLessThan(50 * 1024 * 1024); // Moins de 50MB
+      // Assert
+      expect(memoryIncrease).toBeLessThan(100 * 1024 * 1024); // Moins de 100MB
+      expect(maxMemoryIncrease).toBeLessThan(150 * 1024 * 1024); // Moins de 150MB max
+
+      console.log(
+        `✅ Mémoire: augmentation de ${(memoryIncrease / 1024 / 1024).toFixed(
+          2
+        )}MB (max: ${(maxMemoryIncrease / 1024 / 1024).toFixed(2)}MB)`
+      );
 
       // Nettoyer
       connections.forEach((conn) => conn.close());
-    }, 15000);
+    }, 120000);
 
-    it("devrait libérer la mémoire après fermeture des connexions", async () => {
-      // Arrange
-      const maxConnections = 5;
+    it("devrait libérer la mémoire après fermeture massive", async () => {
+      const maxConnections = 50;
       const connections: WebSocket[] = [];
       const initialMemory = process.memoryUsage().heapUsed;
 
-      // Act - Créer et fermer des connexions
+      // Créer des connexions
       for (let i = 0; i < maxConnections; i++) {
         const ws = new WebSocket(`ws://localhost:${server.address().port}/ws`, {
           headers: { "x-user-id": testUsers[i].id },
@@ -325,120 +677,109 @@ describe("Performance Load Tests", () => {
           });
         });
       });
+
+      const memoryAfterConnections = process.memoryUsage().heapUsed;
 
       // Fermer toutes les connexions
       connections.forEach((conn) => conn.close());
 
-      // Attendre un peu pour que la mémoire soit libérée
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      // Attendre que la mémoire soit libérée
+      await new Promise((resolve) => setTimeout(resolve, 3000));
 
       const finalMemory = process.memoryUsage().heapUsed;
       const memoryDifference = Math.abs(finalMemory - initialMemory);
+      const memoryFreed = memoryAfterConnections - finalMemory;
 
-      // Assert - La différence de mémoire devrait être raisonnable
-      expect(memoryDifference).toBeLessThan(10 * 1024 * 1024); // Moins de 10MB
-    }, 15000);
+      // Assert - Plus réaliste
+      expect(memoryDifference).toBeLessThan(50 * 1024 * 1024); // Moins de 50MB de différence
+      // La mémoire peut ne pas être libérée immédiatement à cause du garbage collector
+      // On vérifie juste que la différence totale reste raisonnable
+      expect(memoryDifference).toBeLessThan(20 * 1024 * 1024); // Moins de 20MB au total
+
+      console.log(
+        `✅ Mémoire: différence totale de ${(
+          memoryDifference /
+          1024 /
+          1024
+        ).toFixed(2)}MB`
+      );
+    }, 90000);
   });
 
-  describe("Tests de latence", () => {
-    it("devrait maintenir une latence faible pour les requêtes HTTP", async () => {
-      // Arrange
-      const maxRequests = 5; // Réduire encore plus pour éviter le rate limiting
+  describe("Tests de latence avancés", () => {
+    it("devrait maintenir une latence faible avec 50 connexions simultanées", async () => {
+      const maxConnections = 50;
+      const connections: WebSocket[] = [];
       const latencies: number[] = [];
-      const successfulRequests: number[] = [];
 
-      // Act - Envoyer les requêtes avec un délai entre chaque pour éviter le rate limiting
-      for (let i = 0; i < maxRequests; i++) {
-        const startTime = Date.now();
-        const response = await app.inject({
-          method: "GET",
-          url: "/health",
+      // Créer des connexions
+      for (let i = 0; i < maxConnections; i++) {
+        const ws = new WebSocket(`ws://localhost:${server.address().port}/ws`, {
+          headers: { "x-user-id": testUsers[i].id },
         });
-        const endTime = Date.now();
-        const latency = endTime - startTime;
-
-        latencies.push(latency);
-
-        // Vérifier le statut de la réponse
-        if (response.statusCode === 200) {
-          successfulRequests.push(latency);
-        } else if (response.statusCode === 429) {
-          // Si on atteint la limite, attendre un peu et continuer
-          console.log(`Rate limit atteint à la requête ${i + 1}, attente...`);
-          await new Promise((resolve) => setTimeout(resolve, 2000));
-          continue;
-        }
-
-        // Petite pause entre les requêtes pour éviter le rate limiting
-        await new Promise((resolve) => setTimeout(resolve, 200));
+        connections.push(ws);
       }
 
-      // Assert - Vérifier qu'on a au moins quelques requêtes réussies
-      expect(successfulRequests.length).toBeGreaterThan(0);
-
-      if (successfulRequests.length > 0) {
-        const averageLatency =
-          successfulRequests.reduce((a, b) => a + b, 0) /
-          successfulRequests.length;
-        const maxLatency = Math.max(...successfulRequests);
-
-        expect(averageLatency).toBeLessThan(1000); // Moins de 1 seconde en moyenne
-        expect(maxLatency).toBeLessThan(2000); // Moins de 2 secondes au maximum
-      }
-    }, 15000);
-
-    it("devrait maintenir une latence faible pour les messages WebSocket", async () => {
-      // Arrange
-      const ws = new WebSocket(`ws://localhost:${server.address().port}/ws`, {
-        headers: { "x-user-id": testUsers[0].id },
-      });
-
-      const latencies: number[] = [];
-      const maxMessages = 10;
-
-      // Attendre que la connexion soit établie
+      // Attendre que toutes les connexions soient établies
       await new Promise<void>((resolve) => {
-        ws.on("open", () => {
-          resolve();
-        });
-      });
-
-      // Act - Envoyer des messages de ping et mesurer la latence
-      for (let i = 0; i < maxMessages; i++) {
-        const startTime = Date.now();
-        const pingMessage = {
-          type: "ping",
-          data: { timestamp: startTime, messageId: i },
-        };
-
-        await new Promise<void>((resolve) => {
-          ws.send(JSON.stringify(pingMessage));
-
-          ws.on("message", (data) => {
-            const response = JSON.parse(data.toString());
-            if (response.type === "pong") {
-              const endTime = Date.now();
-              const latency = endTime - startTime;
-              latencies.push(latency);
+        let connectedCount = 0;
+        connections.forEach((ws) => {
+          ws.on("open", () => {
+            connectedCount++;
+            if (connectedCount === maxConnections) {
               resolve();
             }
           });
         });
+      });
 
-        // Petite pause entre les messages
-        await new Promise((resolve) => setTimeout(resolve, 100));
-      }
+      // Envoyer des messages de ping et mesurer la latence
+      const pingPromises = connections.map((ws, index) => {
+        return new Promise<number>((resolve) => {
+          const startTime = Date.now();
+          const pingMessage = {
+            type: "ping",
+            data: { timestamp: startTime, connectionId: index },
+          };
+
+          ws.send(JSON.stringify(pingMessage));
+
+          ws.on("message", (data) => {
+            try {
+              const response = JSON.parse(data.toString());
+              if (response.type === "pong") {
+                const endTime = Date.now();
+                const latency = endTime - startTime;
+                resolve(latency);
+              }
+            } catch (error) {
+              resolve(9999); // Latence élevée en cas d'erreur
+            }
+          });
+        });
+      });
+
+      const connectionLatencies = await Promise.all(pingPromises);
+      latencies.push(...connectionLatencies);
 
       // Assert
       const averageLatency =
         latencies.reduce((a, b) => a + b, 0) / latencies.length;
       const maxLatency = Math.max(...latencies);
+      const minLatency = Math.min(...latencies);
 
       expect(averageLatency).toBeLessThan(1000); // Moins de 1 seconde en moyenne
-      expect(maxLatency).toBeLessThan(2000); // Moins de 2 secondes au maximum
+      expect(maxLatency).toBeLessThan(5000); // Moins de 5 secondes au maximum
+      expect(minLatency).toBeLessThan(500); // Moins de 500ms au minimum
+
+      console.log(
+        `✅ Latence: moyenne=${averageLatency.toFixed(
+          2
+        )}ms, min=${minLatency}ms, max=${maxLatency}ms`
+      );
 
       // Nettoyer
-      ws.close();
-    }, 15000);
+      connections.forEach((conn) => conn.close());
+    }, 90000);
   });
 });

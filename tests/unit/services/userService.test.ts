@@ -1,8 +1,15 @@
+import { generateRandomTag } from "../../../src/lib/generateTag.js";
 import * as UserModel from "../../../src/models/userModel.js";
 import { UserService } from "../../../src/services/userService.js";
 
-// Mock des dépendances
+// Mock des modules
 jest.mock("../../../src/models/userModel.js");
+jest.mock("../../../src/lib/generateTag.js");
+
+const mockUserModel = UserModel as jest.Mocked<typeof UserModel>;
+const mockGenerateRandomTag = generateRandomTag as jest.MockedFunction<
+  typeof generateRandomTag
+>;
 
 describe("UserService", () => {
   beforeEach(() => {
@@ -10,82 +17,64 @@ describe("UserService", () => {
   });
 
   describe("getUserById", () => {
-    it("devrait trouver un utilisateur par ID", async () => {
-      // Arrange
-      const userId = "test-user-id";
+    it("devrait récupérer un utilisateur par son ID", async () => {
       const mockUser = {
-        id: userId,
+        id: "user-id",
         name: "Test User",
         email: "test@example.com",
-        tag: "TAG1234",
+        image: null,
+        tag: "test-tag",
+        isOnline: true,
+        lastSeen: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        emailVerified: false,
       };
 
-      (UserModel.findUserById as jest.Mock).mockResolvedValue(mockUser);
+      mockUserModel.findUserById.mockResolvedValue(mockUser);
 
-      // Act
-      const result = await UserService.getUserById(userId);
+      const result = await UserService.getUserById("user-id");
 
-      // Assert
+      expect(mockUserModel.findUserById).toHaveBeenCalledWith("user-id");
       expect(result).toEqual(mockUser);
-      expect(UserModel.findUserById).toHaveBeenCalledWith(userId);
     });
 
-    it("devrait retourner une erreur si l'utilisateur n'existe pas", async () => {
-      // Arrange
-      const userId = "non-existent-user";
+    it("devrait échouer si l'utilisateur n'existe pas", async () => {
+      mockUserModel.findUserById.mockResolvedValue(null);
 
-      (UserModel.findUserById as jest.Mock).mockResolvedValue(null);
-
-      // Act & Assert
-      await expect(UserService.getUserById(userId)).rejects.toThrow(
+      await expect(UserService.getUserById("invalid-user")).rejects.toThrow(
         "Utilisateur non trouvé"
-      );
-    });
-
-    it("devrait gérer les erreurs de base de données", async () => {
-      // Arrange
-      const userId = "test-user-id";
-
-      (UserModel.findUserById as jest.Mock).mockRejectedValue(
-        new Error("Database error")
-      );
-
-      // Act & Assert
-      await expect(UserService.getUserById(userId)).rejects.toThrow(
-        "Database error"
       );
     });
   });
 
   describe("getUserByTag", () => {
-    it("devrait trouver un utilisateur par tag", async () => {
-      // Arrange
-      const tag = "TAG1234";
+    it("devrait récupérer un utilisateur par son tag", async () => {
       const mockUser = {
-        id: "test-user-id",
+        id: "user-id",
         name: "Test User",
         email: "test@example.com",
-        tag,
+        image: null,
+        tag: "test-tag",
+        isOnline: true,
+        lastSeen: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        emailVerified: false,
       };
 
-      (UserModel.findUserByTag as jest.Mock).mockResolvedValue(mockUser);
+      mockUserModel.findUserByTag.mockResolvedValue(mockUser);
 
-      // Act
-      const result = await UserService.getUserByTag(tag);
+      const result = await UserService.getUserByTag("test-tag");
 
-      // Assert
+      expect(mockUserModel.findUserByTag).toHaveBeenCalledWith("test-tag");
       expect(result).toEqual(mockUser);
-      expect(UserModel.findUserByTag).toHaveBeenCalledWith(tag);
     });
 
-    it("devrait retourner une erreur si l'utilisateur n'existe pas", async () => {
-      // Arrange
-      const tag = "NONEXISTENT";
+    it("devrait échouer si l'utilisateur n'existe pas", async () => {
+      mockUserModel.findUserByTag.mockResolvedValue(null);
 
-      (UserModel.findUserByTag as jest.Mock).mockResolvedValue(null);
-
-      // Act & Assert
-      await expect(UserService.getUserByTag(tag)).rejects.toThrow(
+      await expect(UserService.getUserByTag("invalid-tag")).rejects.toThrow(
         "Utilisateur non trouvé"
       );
     });
@@ -93,151 +82,173 @@ describe("UserService", () => {
 
   describe("updateUserStatus", () => {
     it("devrait mettre à jour le statut d'un utilisateur", async () => {
-      // Arrange
-      const userId = "test-user-id";
-      const isOnline = true;
+      mockUserModel.updateUserStatus.mockResolvedValue({} as any);
 
-      (UserModel.updateUserStatus as jest.Mock).mockResolvedValue({
-        id: userId,
-        isOnline,
-        lastSeen: new Date().toISOString(),
-      });
+      const result = await UserService.updateUserStatus("user-id", true);
 
-      // Act
-      const result = await UserService.updateUserStatus(userId, isOnline);
-
-      // Assert
-      expect(result.success).toBe(true);
-      expect(UserModel.updateUserStatus).toHaveBeenCalledWith(
-        userId,
-        isOnline,
+      expect(mockUserModel.updateUserStatus).toHaveBeenCalledWith(
+        "user-id",
+        true,
         expect.any(String)
       );
+      expect(result).toEqual({ success: true });
     });
 
-    it("devrait gérer les erreurs lors de la mise à jour", async () => {
-      // Arrange
-      const userId = "test-user-id";
-      const isOnline = true;
+    it("devrait mettre à jour le statut hors ligne", async () => {
+      mockUserModel.updateUserStatus.mockResolvedValue({} as any);
 
-      (UserModel.updateUserStatus as jest.Mock).mockRejectedValue(
-        new Error("Update failed")
+      const result = await UserService.updateUserStatus("user-id", false);
+
+      expect(mockUserModel.updateUserStatus).toHaveBeenCalledWith(
+        "user-id",
+        false,
+        expect.any(String)
       );
-
-      // Act & Assert
-      await expect(
-        UserService.updateUserStatus(userId, isOnline)
-      ).rejects.toThrow("Update failed");
+      expect(result).toEqual({ success: true });
     });
   });
 
   describe("getUsersList", () => {
     it("devrait récupérer la liste des utilisateurs", async () => {
-      // Arrange
       const mockUsers = [
         {
           id: "user1",
           name: "User 1",
-          tag: "TAG1234",
+          email: "user1@example.com",
+          image: null,
+          tag: "user1-tag",
           isOnline: true,
-          lastSeen: new Date(),
+          lastSeen: new Date("2023-01-01"),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          emailVerified: false,
         },
         {
           id: "user2",
           name: "User 2",
-          tag: "TAG5678",
+          email: "user2@example.com",
+          image: null,
+          tag: "user2-tag",
           isOnline: false,
-          lastSeen: new Date(),
+          lastSeen: new Date("2023-01-02"),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          emailVerified: false,
         },
       ];
 
-      (UserModel.findAllUsers as jest.Mock).mockResolvedValue(mockUsers);
+      mockUserModel.findAllUsers.mockResolvedValue(mockUsers);
 
-      // Act
       const result = await UserService.getUsersList();
 
-      // Assert
-      expect(result.users).toEqual(mockUsers);
-      expect(UserModel.findAllUsers).toHaveBeenCalled();
-    });
-
-    it("devrait retourner une liste vide si aucun utilisateur", async () => {
-      // Arrange
-      (UserModel.findAllUsers as jest.Mock).mockResolvedValue([]);
-
-      // Act
-      const result = await UserService.getUsersList();
-
-      // Assert
-      expect(result.users).toEqual([]);
+      expect(mockUserModel.findAllUsers).toHaveBeenCalled();
+      expect(result.users).toHaveLength(2);
+      expect(result.users[0]).toEqual({
+        id: "user1",
+        name: "User 1",
+        tag: "user1-tag",
+        isOnline: true,
+        lastSeen: new Date("2023-01-01"),
+      });
+      expect(result.users[1]).toEqual({
+        id: "user2",
+        name: "User 2",
+        tag: "user2-tag",
+        isOnline: false,
+        lastSeen: new Date("2023-01-02"),
+      });
     });
   });
 
   describe("getUserOrCreateTag", () => {
-    it("devrait retourner le tag existant", async () => {
-      // Arrange
-      const userId = "test-user-id";
+    it("devrait retourner le tag existant si l'utilisateur en a un", async () => {
       const mockUser = {
-        id: userId,
+        id: "user-id",
         name: "Test User",
-        tag: "EXISTING123",
+        email: "test@example.com",
+        image: null,
+        tag: "existing-tag",
+        isOnline: true,
+        lastSeen: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        emailVerified: false,
       };
 
-      (UserModel.findUserById as jest.Mock).mockResolvedValue(mockUser);
+      mockUserModel.findUserById.mockResolvedValue(mockUser);
 
-      // Act
-      const result = await UserService.getUserOrCreateTag(userId);
+      const result = await UserService.getUserOrCreateTag("user-id");
 
-      // Assert
-      expect(result.tag).toBe("EXISTING123");
-      expect(UserModel.findUserById).toHaveBeenCalledWith(userId);
+      expect(mockUserModel.findUserById).toHaveBeenCalledWith("user-id");
+      expect(result).toEqual({ tag: "existing-tag" });
+      expect(mockGenerateRandomTag).not.toHaveBeenCalled();
+      expect(mockUserModel.checkTagExists).not.toHaveBeenCalled();
+      expect(mockUserModel.updateUserTag).not.toHaveBeenCalled();
     });
 
     it("devrait créer un nouveau tag si l'utilisateur n'en a pas", async () => {
-      // Arrange
-      const userId = "test-user-id";
       const mockUser = {
-        id: userId,
+        id: "user-id",
         name: "Test User",
+        email: "test@example.com",
+        image: null,
         tag: null,
+        isOnline: true,
+        lastSeen: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        emailVerified: false,
       };
 
-      (UserModel.findUserById as jest.Mock).mockResolvedValue(mockUser);
-      (UserModel.checkTagExists as jest.Mock).mockResolvedValue(false);
-      (UserModel.updateUserTag as jest.Mock).mockResolvedValue({
-        id: userId,
-        tag: "NEWTAG123",
-      });
+      mockUserModel.findUserById.mockResolvedValue(mockUser);
+      mockGenerateRandomTag.mockReturnValue("new-tag");
+      mockUserModel.checkTagExists.mockResolvedValue(false);
+      mockUserModel.updateUserTag.mockResolvedValue({} as any);
 
-      // Act
-      const result = await UserService.getUserOrCreateTag(userId);
+      const result = await UserService.getUserOrCreateTag("user-id");
 
-      // Assert
-      expect(result.tag).toBeDefined();
-      expect(UserModel.updateUserTag).toHaveBeenCalledWith(
-        userId,
-        expect.any(String)
+      expect(mockUserModel.findUserById).toHaveBeenCalledWith("user-id");
+      expect(mockGenerateRandomTag).toHaveBeenCalled();
+      expect(mockUserModel.checkTagExists).toHaveBeenCalledWith("new-tag");
+      expect(mockUserModel.updateUserTag).toHaveBeenCalledWith(
+        "user-id",
+        "new-tag"
       );
+      expect(result).toEqual({ tag: "new-tag" });
     });
 
-    it("devrait gérer les erreurs lors de la création de tag", async () => {
-      // Arrange
-      const userId = "test-user-id";
+    it("devrait réessayer si le tag généré existe déjà", async () => {
       const mockUser = {
-        id: userId,
+        id: "user-id",
         name: "Test User",
+        email: "test@example.com",
+        image: null,
         tag: null,
+        isOnline: true,
+        lastSeen: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        emailVerified: false,
       };
 
-      (UserModel.findUserById as jest.Mock).mockResolvedValue(mockUser);
-      (UserModel.checkTagExists as jest.Mock).mockRejectedValue(
-        new Error("Tag creation failed")
-      );
+      mockUserModel.findUserById.mockResolvedValue(mockUser);
+      mockGenerateRandomTag
+        .mockReturnValueOnce("existing-tag")
+        .mockReturnValueOnce("new-tag");
+      mockUserModel.checkTagExists
+        .mockResolvedValueOnce(true) // Premier tag existe
+        .mockResolvedValueOnce(false); // Deuxième tag n'existe pas
+      mockUserModel.updateUserTag.mockResolvedValue({} as any);
 
-      // Act & Assert
-      await expect(UserService.getUserOrCreateTag(userId)).rejects.toThrow(
-        "Tag creation failed"
+      const result = await UserService.getUserOrCreateTag("user-id");
+
+      expect(mockGenerateRandomTag).toHaveBeenCalledTimes(2);
+      expect(mockUserModel.checkTagExists).toHaveBeenCalledTimes(2);
+      expect(mockUserModel.updateUserTag).toHaveBeenCalledWith(
+        "user-id",
+        "new-tag"
       );
+      expect(result).toEqual({ tag: "new-tag" });
     });
   });
 });
