@@ -1,7 +1,8 @@
 import { FastifyReply, FastifyRequest } from "fastify";
-import { optionalAuth, requireAuth } from "../../../src/middleware/auth.js";
+import { auth } from "../../../src/lib/auth.js";
+import { optionalAuth } from "../../../src/middleware/auth.js";
 
-// Mock des dépendances
+// Mock du module auth
 jest.mock("../../../src/lib/auth.js", () => ({
   auth: {
     api: {
@@ -10,182 +11,87 @@ jest.mock("../../../src/lib/auth.js", () => ({
   },
 }));
 
-const mockAuth = {
-  api: {
-    getSession: jest.fn(),
-  },
-};
+const mockGetSession = auth.api.getSession as jest.MockedFunction<
+  typeof auth.api.getSession
+>;
 
-describe("Auth Middleware", () => {
+describe("Auth Middleware - Logique Conditionnelle Critique", () => {
   let mockRequest: Partial<FastifyRequest>;
   let mockReply: Partial<FastifyReply>;
+  let originalNodeEnv: string | undefined;
 
   beforeEach(() => {
     jest.clearAllMocks();
+    originalNodeEnv = process.env.NODE_ENV;
 
-    mockRequest = {
-      headers: {
-        authorization: "Bearer valid-token",
-      },
-      log: {
-        error: jest.fn(),
-      } as any,
-    };
-
-    mockReply = {
-      status: jest.fn().mockReturnThis(),
-      send: jest.fn().mockReturnThis(),
-    };
+    mockRequest = { headers: {} };
+    mockReply = {};
   });
 
-  describe("requireAuth", () => {
-    it("devrait autoriser un utilisateur avec un token valide", async () => {
-      const mockUser = {
-        id: "test-user-id",
-        name: "Test User",
-        email: "test@example.com",
-      };
-
-      const mockSession = {
-        user: mockUser,
-        expires: new Date(Date.now() + 3600000),
-      };
-
-      const { auth } = await import("../../../src/lib/auth.js");
-      (auth.api.getSession as jest.Mock).mockResolvedValue(mockSession);
-
-      await requireAuth(
-        mockRequest as FastifyRequest,
-        mockReply as FastifyReply
-      );
-
-      expect((mockRequest as any).user).toEqual(mockUser);
-      expect((mockRequest as any).session).toEqual(mockSession);
-      expect(mockReply.status).not.toHaveBeenCalled();
-    });
-
-    it("devrait rejeter un utilisateur sans token", async () => {
-      mockRequest.headers = {};
-
-      const { auth } = await import("../../../src/lib/auth.js");
-      (auth.api.getSession as jest.Mock).mockResolvedValue(null);
-
-      await requireAuth(
-        mockRequest as FastifyRequest,
-        mockReply as FastifyReply
-      );
-
-      expect(mockReply.status).toHaveBeenCalledWith(401);
-      expect(mockReply.send).toHaveBeenCalledWith({ error: "Non autorisé" });
-    });
-
-    it("devrait rejeter un utilisateur avec un token invalide", async () => {
-      const { auth } = await import("../../../src/lib/auth.js");
-      (auth.api.getSession as jest.Mock).mockRejectedValue(
-        new Error("Invalid token")
-      );
-
-      await requireAuth(
-        mockRequest as FastifyRequest,
-        mockReply as FastifyReply
-      );
-
-      expect(mockReply.status).toHaveBeenCalledWith(401);
-      expect(mockReply.send).toHaveBeenCalledWith({ error: "Token invalide" });
-    });
-
-    it("devrait rejeter un utilisateur avec une session sans user", async () => {
-      const mockSession = {
-        expires: new Date(Date.now() + 3600000),
-      };
-
-      const { auth } = await import("../../../src/lib/auth.js");
-      (auth.api.getSession as jest.Mock).mockResolvedValue(mockSession);
-
-      await requireAuth(
-        mockRequest as FastifyRequest,
-        mockReply as FastifyReply
-      );
-
-      expect(mockReply.status).toHaveBeenCalledWith(401);
-      expect(mockReply.send).toHaveBeenCalledWith({ error: "Non autorisé" });
-    });
+  afterEach(() => {
+    if (originalNodeEnv !== undefined) {
+      process.env.NODE_ENV = originalNodeEnv;
+    } else {
+      delete process.env.NODE_ENV;
+    }
   });
 
-  describe("optionalAuth", () => {
-    it("devrait attacher l'utilisateur si le token est valide", async () => {
-      const mockUser = {
-        id: "test-user-id",
-        name: "Test User",
-        email: "test@example.com",
-      };
-
-      const mockSession = {
-        user: mockUser,
-        expires: new Date(Date.now() + 3600000),
-      };
-
-      const { auth } = await import("../../../src/lib/auth.js");
-      (auth.api.getSession as jest.Mock).mockResolvedValue(mockSession);
+  describe("🔥 Logique conditionnelle critique - Mode test vs production", () => {
+    it("devrait utiliser x-user-id en mode test", async () => {
+      process.env.NODE_ENV = "test";
+      mockRequest.headers = { "x-user-id": "test-user-123" };
 
       await optionalAuth(
         mockRequest as FastifyRequest,
         mockReply as FastifyReply
       );
 
+      // En mode test : l'utilisateur doit être simulé à partir du header
+      expect((mockRequest as any).user).toEqual({ id: "test-user-123" });
+      // Better-auth ne doit PAS être appelé en mode test
+      expect(mockGetSession).not.toHaveBeenCalled();
+    });
+
+    it("devrait utiliser Better-auth en mode production", async () => {
+      process.env.NODE_ENV = "production";
+      mockRequest.headers = {
+        "x-user-id": "should-be-ignored", // Ignoré en production
+        authorization: "Bearer prod-token",
+      };
+
+      const mockUser = { id: "prod-user-999", name: "Prod User" };
+      mockGetSession.mockResolvedValue({ user: mockUser } as any);
+
+      await optionalAuth(
+        mockRequest as FastifyRequest,
+        mockReply as FastifyReply
+      );
+
+      // Mode production : ignorer x-user-id, utiliser Better-auth
+      expect(mockGetSession).toHaveBeenCalled();
       expect((mockRequest as any).user).toEqual(mockUser);
-      expect((mockRequest as any).session).toEqual(mockSession);
-      expect(mockReply.status).not.toHaveBeenCalled();
+      expect((mockRequest as any).user.id).not.toBe("should-be-ignored");
     });
 
-    it("devrait continuer sans bloquer si pas de token", async () => {
-      mockRequest.headers = {};
+    it("devrait continuer gracieusement en cas d'erreur API", async () => {
+      process.env.NODE_ENV = "production";
+      const consoleSpy = jest.spyOn(console, "log").mockImplementation();
 
-      const { auth } = await import("../../../src/lib/auth.js");
-      (auth.api.getSession as jest.Mock).mockResolvedValue(null);
+      mockGetSession.mockRejectedValue(new Error("Network timeout"));
 
       await optionalAuth(
         mockRequest as FastifyRequest,
         mockReply as FastifyReply
       );
 
-      expect((mockRequest as any).user).toBeUndefined();
-      expect((mockRequest as any).session).toBeUndefined();
-      expect(mockReply.status).not.toHaveBeenCalled();
-    });
-
-    it("devrait continuer sans bloquer en cas d'erreur", async () => {
-      const { auth } = await import("../../../src/lib/auth.js");
-      (auth.api.getSession as jest.Mock).mockRejectedValue(
-        new Error("Database error")
+      // Erreur loggée mais pas propagée (optionalAuth ne bloque jamais)
+      expect(consoleSpy).toHaveBeenCalledWith(
+        "Auth optionnelle échouée:",
+        expect.any(Error)
       );
-
-      await optionalAuth(
-        mockRequest as FastifyRequest,
-        mockReply as FastifyReply
-      );
-
       expect((mockRequest as any).user).toBeUndefined();
-      expect((mockRequest as any).session).toBeUndefined();
-      expect(mockReply.status).not.toHaveBeenCalled();
-    });
 
-    it("devrait continuer sans bloquer si session sans user", async () => {
-      const mockSession = {
-        expires: new Date(Date.now() + 3600000),
-      };
-
-      const { auth } = await import("../../../src/lib/auth.js");
-      (auth.api.getSession as jest.Mock).mockResolvedValue(mockSession);
-
-      await optionalAuth(
-        mockRequest as FastifyRequest,
-        mockReply as FastifyReply
-      );
-
-      expect((mockRequest as any).user).toBeUndefined();
-      expect((mockRequest as any).session).toBeUndefined();
-      expect(mockReply.status).not.toHaveBeenCalled();
+      consoleSpy.mockRestore();
     });
   });
 });

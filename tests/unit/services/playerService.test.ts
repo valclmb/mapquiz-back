@@ -41,115 +41,135 @@ describe("PlayerService", () => {
   });
 
   describe("updatePlayerScore", () => {
-    it("devrait mettre à jour le score d'un joueur sans bonus", () => {
-      const player: PlayerProgress = {
-        status: "playing",
-        score: 0,
-        progress: 0,
-        name: "Test Player",
-        validatedCountries: [],
-        incorrectCountries: [],
-      };
+    // ✅ TESTS DE LOGIQUE MÉTIER COMPLEXE
+    describe("Calculs de bonus combinés", () => {
+      it("devrait cumuler correctement tous les bonus (vitesse + consécutif)", () => {
+        const player: PlayerProgress = {
+          status: "playing",
+          score: 0,
+          progress: 0,
+          name: "Test Player",
+          validatedCountries: [],
+          incorrectCountries: [],
+          consecutiveCorrect: 4, // 4 * 10 = 40 points bonus
+        };
 
-      const updatedPlayer = PlayerService.updatePlayerScore(player, 100, 50);
+        // Score base: 100, vitesse: 1000ms → bonus = (3000-1000)/100 = 20
+        // Consécutif: 4 * 10 = 40 → Total: 100 + 20 + 40 = 160
+        const updatedPlayer = PlayerService.updatePlayerScore(
+          player,
+          100,
+          50,
+          1000, // Réponse rapide
+          true // Consécutive correcte
+        );
 
-      expect(updatedPlayer.score).toBe(100);
-      expect(updatedPlayer.progress).toBe(50);
-      expect(updatedPlayer.lastAnswerTime).toBeUndefined();
-      expect(updatedPlayer.consecutiveCorrect).toBe(0);
+        expect(updatedPlayer.score).toBe(160); // Score + bonus vitesse + bonus consécutif
+        expect(updatedPlayer.consecutiveCorrect).toBe(5); // Incrémenté
+        expect(updatedPlayer.lastAnswerTime).toBe(1000);
+      });
+
+      it("devrait plafonner le bonus consécutif à 50 même avec haute série", () => {
+        const player: PlayerProgress = {
+          status: "playing",
+          score: 0,
+          progress: 0,
+          name: "Test Player",
+          validatedCountries: [],
+          incorrectCountries: [],
+          consecutiveCorrect: 15, // 15 * 10 = 150, mais plafonné à 50
+        };
+
+        const updatedPlayer = PlayerService.updatePlayerScore(
+          player,
+          100,
+          50,
+          undefined,
+          true
+        );
+
+        // ✅ Test de la logique de plafonnement (ligne 60 du service)
+        expect(updatedPlayer.score).toBe(150); // 100 + min(150, 50)
+        expect(updatedPlayer.consecutiveCorrect).toBe(16);
+      });
+
+      it("ne devrait pas appliquer bonus vitesse pour réponses lentes (≥3000ms)", () => {
+        const player: PlayerProgress = {
+          status: "playing",
+          score: 0,
+          progress: 0,
+          name: "Test Player",
+          validatedCountries: [],
+          incorrectCountries: [],
+        };
+
+        const updatedPlayer = PlayerService.updatePlayerScore(
+          player,
+          100,
+          50,
+          3500 // Réponse lente
+        );
+
+        // ✅ Test de la condition answerTime < 3000 (ligne 53)
+        expect(updatedPlayer.score).toBe(100); // Pas de bonus vitesse
+        expect(updatedPlayer.lastAnswerTime).toBe(3500);
+        expect(updatedPlayer.consecutiveCorrect).toBe(0);
+      });
     });
 
-    it("devrait appliquer un bonus de vitesse pour les réponses rapides", () => {
-      const player: PlayerProgress = {
-        status: "playing",
-        score: 0,
-        progress: 0,
-        name: "Test Player",
-        validatedCountries: [],
-        incorrectCountries: [],
-      };
+    describe("Gestion des cas limites", () => {
+      it("devrait gérer consecutiveCorrect undefined sans crash", () => {
+        const player: PlayerProgress = {
+          status: "playing",
+          score: 50,
+          progress: 25,
+          name: "Test Player",
+          validatedCountries: [],
+          incorrectCountries: [],
+          // consecutiveCorrect: undefined (absent)
+        };
 
-      const updatedPlayer = PlayerService.updatePlayerScore(
-        player,
-        100,
-        50,
-        1500
-      );
+        const updatedPlayer = PlayerService.updatePlayerScore(
+          player,
+          100,
+          75,
+          2000,
+          true
+        );
 
-      // Bonus de vitesse: (3000 - 1500) / 100 = 15
-      expect(updatedPlayer.score).toBe(115);
-      expect(updatedPlayer.lastAnswerTime).toBe(1500);
-    });
+        // ✅ Test de || 0 fallback (ligne 70)
+        expect(updatedPlayer.score).toBe(110); // 100 + (3000-2000)/100 + 0*10
+        expect(updatedPlayer.consecutiveCorrect).toBe(1); // (0 || 0) + 1
+      });
 
-    it("devrait appliquer un bonus pour les réponses consécutives correctes", () => {
-      const player: PlayerProgress = {
-        status: "playing",
-        score: 0,
-        progress: 0,
-        name: "Test Player",
-        validatedCountries: [],
-        incorrectCountries: [],
-        consecutiveCorrect: 3,
-      };
+      it("devrait préserver les autres propriétés du joueur", () => {
+        const player: PlayerProgress = {
+          status: "playing",
+          score: 25,
+          progress: 30,
+          name: "Joueur Test",
+          validatedCountries: ["France", "Germany"],
+          incorrectCountries: ["Spain"],
+          consecutiveCorrect: 2,
+        };
 
-      const updatedPlayer = PlayerService.updatePlayerScore(
-        player,
-        100,
-        50,
-        undefined,
-        true
-      );
+        const updatedPlayer = PlayerService.updatePlayerScore(
+          player,
+          80,
+          60,
+          2500,
+          false // Réponse incorrecte
+        );
 
-      // Bonus consécutif: 3 * 10 = 30
-      expect(updatedPlayer.score).toBe(130);
-      expect(updatedPlayer.consecutiveCorrect).toBe(4);
-    });
-
-    it("devrait réinitialiser le compteur consécutif si la réponse est incorrecte", () => {
-      const player: PlayerProgress = {
-        status: "playing",
-        score: 0,
-        progress: 0,
-        name: "Test Player",
-        validatedCountries: [],
-        incorrectCountries: [],
-        consecutiveCorrect: 3,
-      };
-
-      const updatedPlayer = PlayerService.updatePlayerScore(
-        player,
-        100,
-        50,
-        undefined,
-        false
-      );
-
-      expect(updatedPlayer.score).toBe(100);
-      expect(updatedPlayer.consecutiveCorrect).toBe(0);
-    });
-
-    it("devrait limiter le bonus consécutif à 50", () => {
-      const player: PlayerProgress = {
-        status: "playing",
-        score: 0,
-        progress: 0,
-        name: "Test Player",
-        validatedCountries: [],
-        incorrectCountries: [],
-        consecutiveCorrect: 10,
-      };
-
-      const updatedPlayer = PlayerService.updatePlayerScore(
-        player,
-        100,
-        50,
-        undefined,
-        true
-      );
-
-      // Bonus consécutif limité à 50
-      expect(updatedPlayer.score).toBe(150);
-      expect(updatedPlayer.consecutiveCorrect).toBe(11);
+        // ✅ Test de l'immutabilité et préservation des données
+        expect(updatedPlayer.name).toBe("Joueur Test");
+        expect(updatedPlayer.status).toBe("playing");
+        expect(updatedPlayer.validatedCountries).toEqual(["France", "Germany"]);
+        expect(updatedPlayer.incorrectCountries).toEqual(["Spain"]);
+        expect(updatedPlayer.score).toBe(85); // 80 + (3000-2500)/100
+        expect(updatedPlayer.progress).toBe(60);
+        expect(updatedPlayer.consecutiveCorrect).toBe(0); // Réinitialisé
+      });
     });
   });
 
@@ -251,6 +271,8 @@ describe("PlayerService", () => {
       const result = PlayerService.areAllPlayersReady(players, "player1");
 
       expect(result).toBe(true);
+      expect(players.get("player1")?.status).toBe("ready");
+      expect(players.get("player2")?.status).toBe("ready");
     });
 
     it("devrait retourner false si un joueur n'est pas prêt", () => {
@@ -282,9 +304,11 @@ describe("PlayerService", () => {
       const result = PlayerService.areAllPlayersReady(players, "player1");
 
       expect(result).toBe(false);
+      expect(players.get("player1")?.status).toBe("ready");
+      expect(players.get("player2")?.status).toBe("joined");
     });
 
-    it("devrait ignorer l'hôte dans la vérification", async () => {
+    it("devrait vérifier tous les joueurs, y compris l'hôte", () => {
       const players = new Map<string, PlayerProgress>([
         [
           "host",
@@ -325,6 +349,9 @@ describe("PlayerService", () => {
 
       // Le service vérifie tous les joueurs, y compris l'hôte
       expect(result).toBe(false);
+      expect(players.get("host")?.status).toBe("joined");
+      expect(players.get("player1")?.status).toBe("ready");
+      expect(players.get("player2")?.status).toBe("ready");
     });
   });
 
@@ -373,37 +400,81 @@ describe("PlayerService", () => {
       expect(player2?.validatedCountries).toEqual([]);
       expect(player2?.incorrectCountries).toEqual([]);
     });
+
+    it("devrait réinitialiser les propriétés optionnelles (lastAnswerTime, consecutiveCorrect)", () => {
+      const players = new Map<string, PlayerProgress>([
+        [
+          "player1",
+          {
+            status: "finished",
+            score: 250,
+            progress: 100,
+            name: "Player Expert",
+            validatedCountries: ["France", "Germany", "Spain"],
+            incorrectCountries: ["Italy"],
+            lastAnswerTime: 1500, // Propriété optionnelle présente
+            consecutiveCorrect: 8, // Propriété optionnelle présente
+          },
+        ],
+      ]);
+
+      const resetPlayers = PlayerService.resetPlayersForNewGame(players);
+
+      const player1 = resetPlayers.get("player1");
+
+      // ✅ Test de la réinitialisation complète (lignes 136-137)
+      expect(player1?.lastAnswerTime).toBeUndefined();
+      expect(player1?.consecutiveCorrect).toBe(0);
+      expect(player1?.name).toBe("Player Expert"); // Nom préservé
+      expect(player1?.status).toBe("joined");
+      expect(player1?.score).toBe(0);
+      expect(player1?.progress).toBe(0);
+    });
   });
 
   describe("checkGameCompletion", () => {
-    it("devrait retourner true si le joueur a terminé la partie", () => {
+    it("devrait retourner true quand progress >= totalQuestions", () => {
       const player: PlayerProgress = {
         status: "playing",
         score: 100,
-        progress: 100,
+        progress: 100, // ✅ Test selon service réel : progress >= totalQuestions
         name: "Test Player",
         validatedCountries: ["France", "Germany", "Spain"],
         incorrectCountries: ["Italy"],
       };
 
-      const result = PlayerService.checkGameCompletion(player, 4);
-
+      // ✅ Logique réelle du service (ligne 151): progress >= totalQuestions
+      const result = PlayerService.checkGameCompletion(player, 100);
       expect(result).toBe(true);
     });
 
-    it("devrait retourner false si le joueur n'a pas terminé", () => {
+    it("devrait retourner false si progress < totalQuestions", () => {
       const player: PlayerProgress = {
         status: "playing",
         score: 50,
-        progress: 50, // 50% de progression
+        progress: 80, // 80 < 100
         name: "Test Player",
         validatedCountries: ["France"],
         incorrectCountries: ["Spain"],
       };
 
-      const result = PlayerService.checkGameCompletion(player, 100); // 100 questions totales
-
+      const result = PlayerService.checkGameCompletion(player, 100);
       expect(result).toBe(false);
+    });
+
+    it("devrait gérer les cas limites de progression exacte", () => {
+      const player: PlayerProgress = {
+        status: "playing",
+        score: 75,
+        progress: 50, // Exactement égal à totalQuestions
+        name: "Test Player",
+        validatedCountries: ["France", "Spain"],
+        incorrectCountries: ["Germany"],
+      };
+
+      // ✅ Test du cas limite progress === totalQuestions
+      const result = PlayerService.checkGameCompletion(player, 50);
+      expect(result).toBe(true); // 50 >= 50
     });
   });
 
@@ -457,14 +528,14 @@ describe("PlayerService", () => {
       expect(rankings[2].rank).toBe(3);
     });
 
-    it("devrait gérer les égalités de score", () => {
+    it("devrait trier par score puis progression en cas d'égalité", () => {
       const players = new Map<string, PlayerProgress>([
         [
           "player1",
           {
             status: "finished",
             score: 100,
-            progress: 100,
+            progress: 80, // Score égal mais progress plus faible
             name: "Player 1",
             validatedCountries: ["France", "Germany"],
             incorrectCountries: [],
@@ -475,7 +546,7 @@ describe("PlayerService", () => {
           {
             status: "finished",
             score: 100,
-            progress: 100,
+            progress: 95, // Score égal mais progress plus élevée → meilleur rang
             name: "Player 2",
             validatedCountries: ["France", "Germany"],
             incorrectCountries: [],
@@ -485,9 +556,52 @@ describe("PlayerService", () => {
 
       const rankings = PlayerService.calculateRankings(players);
 
+      // ✅ Test de la logique de tri complexe (lignes 167-172)
       expect(rankings).toHaveLength(2);
+      expect(rankings[0].id).toBe("player2"); // Meilleure progression
       expect(rankings[0].rank).toBe(1);
-      expect(rankings[1].rank).toBe(2); // Le service attribue des rangs séquentiels
+      expect(rankings[0].progress).toBe(95);
+      expect(rankings[1].id).toBe("player1"); // Progression plus faible
+      expect(rankings[1].rank).toBe(2);
+      expect(rankings[1].progress).toBe(80);
+    });
+
+    it("devrait ajouter les propriétés manquantes (completionTime)", () => {
+      const players = new Map<string, PlayerProgress>([
+        [
+          "player1",
+          {
+            status: "finished",
+            score: 100,
+            progress: 100,
+            name: "Player 1",
+            validatedCountries: ["France"],
+            incorrectCountries: [],
+          },
+        ],
+      ]);
+
+      const rankings = PlayerService.calculateRankings(players);
+
+      // ✅ Test des propriétés ajoutées (ligne 178)
+      expect(rankings[0]).toMatchObject({
+        id: "player1",
+        name: "Player 1",
+        score: 100,
+        progress: 100,
+        status: "finished",
+        rank: 1,
+        completionTime: null, // Propriété ajoutée par défaut
+      });
+    });
+
+    it("devrait gérer Map vide sans erreur", () => {
+      const players = new Map<string, PlayerProgress>();
+
+      const rankings = PlayerService.calculateRankings(players);
+
+      expect(rankings).toEqual([]);
+      expect(rankings).toHaveLength(0);
     });
   });
 });

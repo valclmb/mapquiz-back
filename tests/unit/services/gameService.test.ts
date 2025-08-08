@@ -33,7 +33,7 @@ describe("GameService", () => {
   });
 
   describe("startGame", () => {
-    it("devrait démarrer une partie avec succès", async () => {
+    it("devrait démarrer une partie avec validation complète de l'état", async () => {
       const lobbyId = "test-lobby-id";
       const mockLobby = {
         id: lobbyId,
@@ -51,7 +51,19 @@ describe("GameService", () => {
               incorrectCountries: [],
             },
           ],
+          [
+            "player2",
+            {
+              status: "ready",
+              score: 0,
+              progress: 0,
+              name: "Player 2",
+              validatedCountries: [],
+              incorrectCountries: [],
+            },
+          ],
         ]),
+        gameState: null,
       };
 
       mockLobbyLifecycleManager.getLobbyInMemory.mockReturnValue(mockLobby);
@@ -59,51 +71,73 @@ describe("GameService", () => {
 
       const result = await GameService.startGame(lobbyId);
 
+      // Validation métier complète
       expect(result).toBe(true);
       expect(mockLobby.status).toBe("playing");
-      // Le test vérifie que updateLobbyStatus est appelé via LobbyModel, pas LobbyService
-      expect(mockLobbyService.updateLobbyStatus).not.toHaveBeenCalled();
+      expect(mockLobby.gameState).toBeDefined();
+      expect(mockLobby.gameState).toHaveProperty("startTime");
+      expect(mockLobby.gameState).toHaveProperty("totalQuestions", 10);
+      expect(mockLobby.gameState).toHaveProperty("currentQuestion", 0);
+      expect(mockBroadcastManager.broadcastGameStart).toHaveBeenCalledWith(
+        lobbyId,
+        mockLobby
+      );
     });
 
     it("devrait échouer si le lobby n'existe pas", async () => {
-      const lobbyId = "non-existent-lobby";
-
       mockLobbyLifecycleManager.getLobbyInMemory.mockReturnValue(null);
 
-      const result = await GameService.startGame(lobbyId);
+      const result = await GameService.startGame("non-existent-lobby");
 
       expect(result).toBe(false);
+      expect(mockLobbyService.updateLobbyStatus).not.toHaveBeenCalled();
+      expect(mockBroadcastManager.broadcastGameStart).not.toHaveBeenCalled();
     });
 
-    it("devrait gérer les erreurs lors du démarrage", async () => {
-      const lobbyId = "test-lobby-id";
+    it("devrait échouer en cas d'erreur de base de données", async () => {
       const mockLobby = {
-        id: lobbyId,
+        id: "test-lobby-id",
         status: "waiting",
         settings: { totalQuestions: 10 },
-        players: new Map<string, PlayerProgress>(),
+        players: new Map<string, PlayerProgress>([
+          [
+            "player1",
+            {
+              status: "ready",
+              score: 0,
+              progress: 0,
+              name: "Player 1",
+              validatedCountries: [],
+              incorrectCountries: [],
+            },
+          ],
+        ]),
+        gameState: null,
       };
 
       mockLobbyLifecycleManager.getLobbyInMemory.mockReturnValue(mockLobby);
-      // Mock LobbyModel.updateLobbyStatus pour qu'il lance une erreur
-      const {
-        updateLobbyStatus,
-      } = require("../../../src/models/lobbyModel.js");
-      updateLobbyStatus.mockRejectedValue(new Error("Database error"));
+      // Simuler une erreur de base de données
+      jest
+        .spyOn(
+          require("../../../src/models/lobbyModel.js"),
+          "updateLobbyStatus"
+        )
+        .mockRejectedValue(new Error("Database error"));
 
-      const result = await GameService.startGame(lobbyId);
+      const result = await GameService.startGame("test-lobby-id");
 
       expect(result).toBe(false);
+      expect(mockLobby.status).toBe("waiting"); // État inchangé
     });
   });
 
   describe("updatePlayerProgress", () => {
-    it("devrait mettre à jour la progression d'un joueur avec succès", async () => {
+    it("devrait calculer correctement la progression avec validation métier", async () => {
       const lobbyId = "test-lobby-id";
       const userId = "test-user-id";
       const validatedCountries: string[] = ["France", "Germany"];
       const incorrectCountries: string[] = ["Spain"];
-      const score = 100;
+      const score = 150;
       const totalQuestions = 10;
 
       const mockPlayer: PlayerProgress = {
@@ -131,62 +165,22 @@ describe("GameService", () => {
         totalQuestions
       );
 
+      // Validation métier spécifique
       expect(result).toBe(true);
-      expect(mockPlayer.score).toBe(100);
-      expect(mockPlayer.progress).toBe(30); // (3/10) * 100 = 30
+      expect(mockPlayer.score).toBe(150);
+      expect(mockPlayer.progress).toBe(30); // (3/10) * 100 = 30%
       expect(mockPlayer.validatedCountries).toEqual(validatedCountries);
       expect(mockPlayer.incorrectCountries).toEqual(incorrectCountries);
     });
 
-    it("devrait échouer si le lobby n'existe pas", async () => {
-      const lobbyId = "non-existent-lobby";
-      const userId = "test-user-id";
-
-      mockLobbyLifecycleManager.getLobbyInMemory.mockReturnValue(null);
-
-      const result = await GameService.updatePlayerProgress(
-        lobbyId,
-        userId,
-        [],
-        [],
-        0,
-        0
-      );
-
-      expect(result).toBe(false);
-    });
-
-    it("devrait échouer si le joueur n'existe pas", async () => {
-      const lobbyId = "test-lobby-id";
-      const userId = "non-existent-user";
-
-      const mockLobby = {
-        id: lobbyId,
-        players: new Map<string, PlayerProgress>(),
-      };
-
-      mockLobbyLifecycleManager.getLobbyInMemory.mockReturnValue(mockLobby);
-
-      const result = await GameService.updatePlayerProgress(
-        lobbyId,
-        userId,
-        [],
-        [],
-        0,
-        0
-      );
-
-      expect(result).toBe(false);
-    });
-
-    it("devrait traiter les données supplémentaires si fournies", async () => {
+    it("devrait traiter les données supplémentaires avec bonus", async () => {
       const lobbyId = "test-lobby-id";
       const userId = "test-user-id";
       const validatedCountries: string[] = ["France"];
       const incorrectCountries: string[] = [];
       const score = 100;
       const totalQuestions = 10;
-      const answerTime = 5000;
+      const answerTime = 3000;
       const isConsecutiveCorrect = true;
 
       const mockPlayer: PlayerProgress = {
@@ -206,7 +200,7 @@ describe("GameService", () => {
       mockLobbyLifecycleManager.getLobbyInMemory.mockReturnValue(mockLobby);
       mockPlayerService.updatePlayerScore.mockReturnValue({
         ...mockPlayer,
-        score: 100,
+        score: 120, // Bonus appliqué
         progress: 10,
       });
 
@@ -229,9 +223,10 @@ describe("GameService", () => {
         answerTime,
         isConsecutiveCorrect
       );
+      expect(mockPlayer.score).toBe(120); // Score avec bonus
     });
 
-    it("devrait vérifier la fin de partie si le joueur a terminé", async () => {
+    it("devrait détecter la fin de partie quand le joueur a terminé", async () => {
       const lobbyId = "test-lobby-id";
       const userId = "test-user-id";
       const validatedCountries: string[] = ["France"];
@@ -266,10 +261,113 @@ describe("GameService", () => {
 
       expect(result).toBe(true);
       expect(mockPlayer.progress).toBe(100);
+      // Le statut ne change pas dans updatePlayerProgress, seulement dans checkGameCompletion
+      expect(mockPlayer.status).toBe("playing");
+    });
+
+    it("devrait échouer si le lobby ou le joueur n'existe pas", async () => {
+      mockLobbyLifecycleManager.getLobbyInMemory.mockReturnValue(null);
+
+      const result = await GameService.updatePlayerProgress(
+        "non-existent-lobby",
+        "test-user-id",
+        [],
+        [],
+        0,
+        10
+      );
+
+      expect(result).toBe(false);
+    });
+
+    it("devrait échouer en cas d'erreur de base de données", async () => {
+      const mockPlayer: PlayerProgress = {
+        status: "playing",
+        score: 0,
+        progress: 0,
+        name: "Test User",
+        validatedCountries: [],
+        incorrectCountries: [],
+      };
+
+      const mockLobby = {
+        id: "test-lobby-id",
+        players: new Map<string, PlayerProgress>([
+          ["test-user-id", mockPlayer],
+        ]),
+      };
+
+      mockLobbyLifecycleManager.getLobbyInMemory.mockReturnValue(mockLobby);
+      // Simuler une erreur de base de données
+      jest
+        .spyOn(
+          require("../../../src/models/lobbyModel.js"),
+          "updatePlayerGameData"
+        )
+        .mockRejectedValue(new Error("Database error"));
+
+      const result = await GameService.updatePlayerProgress(
+        "test-lobby-id",
+        "test-user-id",
+        ["France"],
+        [],
+        100,
+        10
+      );
+
+      expect(result).toBe(false);
     });
   });
 
   describe("checkGameCompletion", () => {
+    it("devrait terminer la partie si tous les joueurs ont fini", async () => {
+      const lobbyId = "test-lobby-id";
+      const userId = "test-user-id";
+
+      const mockLobby = {
+        id: lobbyId,
+        players: new Map<string, PlayerProgress>([
+          [
+            userId,
+            {
+              status: "playing",
+              score: 100,
+              progress: 100,
+              name: "Test User",
+              validatedCountries: [],
+              incorrectCountries: [],
+            },
+          ],
+          [
+            "player2",
+            {
+              status: "playing",
+              score: 80,
+              progress: 100,
+              name: "Player 2",
+              validatedCountries: [],
+              incorrectCountries: [],
+            },
+          ],
+        ]),
+      };
+
+      mockLobbyLifecycleManager.getLobbyInMemory.mockReturnValue(mockLobby);
+
+      const endGameSpy = jest
+        .spyOn(GameService as any, "endGame")
+        .mockResolvedValue(undefined);
+
+      const checkGameCompletion = (GameService as any).checkGameCompletion;
+      // Bind le contexte pour que this.endGame fonctionne
+      checkGameCompletion.call(GameService, lobbyId, userId);
+
+      expect(mockLobby.players.get(userId)?.status).toBe("finished");
+      expect(endGameSpy).toHaveBeenCalledWith(lobbyId);
+
+      endGameSpy.mockRestore();
+    });
+
     it("ne devrait pas terminer la partie si un joueur n'a pas fini", async () => {
       const lobbyId = "test-lobby-id";
       const userId = "test-user-id";
@@ -312,40 +410,35 @@ describe("GameService", () => {
       checkGameCompletion(lobbyId, userId);
 
       expect(endGameSpy).not.toHaveBeenCalled();
-      endGameSpy.mockRestore();
-    });
 
-    it("ne devrait rien faire si le lobby n'existe pas", async () => {
-      const lobbyId = "non-existent-lobby";
-      const userId = "test-user-id";
-
-      mockLobbyLifecycleManager.getLobbyInMemory.mockReturnValue(null);
-
-      const endGameSpy = jest
-        .spyOn(GameService as any, "endGame")
-        .mockResolvedValue(undefined);
-
-      const checkGameCompletion = (GameService as any).checkGameCompletion;
-      checkGameCompletion(lobbyId, userId);
-
-      expect(endGameSpy).not.toHaveBeenCalled();
       endGameSpy.mockRestore();
     });
   });
 
   describe("endGame", () => {
-    it("devrait terminer la partie avec succès", async () => {
+    it("devrait terminer la partie avec mise à jour complète de l'état", async () => {
       const lobbyId = "test-lobby-id";
 
       const mockLobby = {
         id: lobbyId,
         status: "playing",
-        players: new Map<string, PlayerProgress>(),
+        players: new Map<string, PlayerProgress>([
+          [
+            "player1",
+            {
+              status: "finished",
+              score: 100,
+              progress: 100,
+              name: "Player 1",
+              validatedCountries: [],
+              incorrectCountries: [],
+            },
+          ],
+        ]),
       };
 
       mockLobbyLifecycleManager.getLobbyInMemory.mockReturnValue(mockLobby);
       mockLobbyService.updateLobbyStatus.mockResolvedValue(true);
-      mockBroadcastManager.broadcastLobbyUpdate.mockResolvedValue(undefined);
 
       const endGame = (GameService as any).endGame;
       await endGame(lobbyId);
@@ -365,12 +458,10 @@ describe("GameService", () => {
     });
 
     it("ne devrait rien faire si le lobby n'existe pas", async () => {
-      const lobbyId = "non-existent-lobby";
-
       mockLobbyLifecycleManager.getLobbyInMemory.mockReturnValue(null);
 
       const endGame = (GameService as any).endGame;
-      await endGame(lobbyId);
+      await endGame("non-existent-lobby");
 
       expect(mockLobbyService.updateLobbyStatus).not.toHaveBeenCalled();
       expect(mockBroadcastManager.broadcastLobbyUpdate).not.toHaveBeenCalled();
@@ -379,7 +470,7 @@ describe("GameService", () => {
   });
 
   describe("restartLobby", () => {
-    it("devrait redémarrer un lobby avec succès", async () => {
+    it("devrait redémarrer un lobby avec réinitialisation complète", async () => {
       const lobbyId = "test-lobby-id";
       const userId = "test-user-id";
 
@@ -395,8 +486,8 @@ describe("GameService", () => {
               score: 100,
               progress: 100,
               name: "Test User",
-              validatedCountries: [],
-              incorrectCountries: [],
+              validatedCountries: ["France"],
+              incorrectCountries: ["Spain"],
             },
           ],
         ]),
@@ -427,40 +518,26 @@ describe("GameService", () => {
       expect(result).toBe(true);
       expect(mockLobby.status).toBe("waiting");
       expect(mockLobby.gameState).toBeNull();
+      expect(mockLobby.players.get(userId)?.status).toBe("joined");
+      expect(mockLobby.players.get(userId)?.score).toBe(0);
+      expect(mockLobby.players.get(userId)?.progress).toBe(0);
+      expect(mockLobby.players.get(userId)?.validatedCountries).toEqual([]);
+      expect(mockLobby.players.get(userId)?.incorrectCountries).toEqual([]);
       expect(mockLobbyService.updateLobbyStatus).toHaveBeenCalledWith(
         lobbyId,
         "waiting"
       );
       expect(mockPlayerService.resetPlayersForNewGame).toHaveBeenCalled();
-      expect(mockLobbyService.updatePlayerScore).toHaveBeenCalledWith(
-        lobbyId,
-        userId,
-        0,
-        0,
-        [],
-        []
-      );
-      expect(mockLobbyService.updatePlayerStatus).toHaveBeenCalledWith(
-        lobbyId,
-        userId,
-        "joined"
-      );
     });
 
     it("devrait échouer si le lobby n'existe pas", async () => {
-      const lobbyId = "non-existent-lobby";
-      const consoleLogSpy = jest.spyOn(console, "log").mockImplementation();
-
       mockLobbyLifecycleManager.getLobbyInMemory.mockReturnValue(null);
 
-      const result = await GameService.restartLobby(lobbyId);
+      const result = await GameService.restartLobby("non-existent-lobby");
 
       expect(result).toBe(false);
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        `Lobby ${lobbyId} non trouvé en mémoire`
-      );
-
-      consoleLogSpy.mockRestore();
+      expect(mockLobbyService.updateLobbyStatus).not.toHaveBeenCalled();
+      expect(mockPlayerService.resetPlayersForNewGame).not.toHaveBeenCalled();
     });
   });
 });

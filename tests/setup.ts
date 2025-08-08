@@ -149,6 +149,85 @@ export const testUtils = {
     return new Promise((resolve) => setTimeout(resolve, ms));
   },
 
+  // Utilitaires pour les nouveaux tests WebSocket sans mocks
+
+  // Trouver un lobby en base de données
+  async findLobbyInDB(lobbyId: string) {
+    return await prisma.gameLobby.findUnique({
+      where: { id: lobbyId },
+      include: {
+        host: true,
+        players: {
+          include: {
+            user: true,
+          },
+        },
+      },
+    });
+  },
+
+  // Mettre à jour le statut d'un lobby
+  async updateLobbyStatus(lobbyId: string, status: string) {
+    return await prisma.gameLobby.update({
+      where: { id: lobbyId },
+      data: { status },
+    });
+  },
+
+  // Ajouter un joueur à un lobby
+  async addPlayerToLobby(lobbyId: string, userId: string) {
+    return await prisma.lobbyPlayer.create({
+      data: {
+        lobbyId,
+        userId,
+        status: "joined",
+      },
+    });
+  },
+
+  // Obtenir les joueurs d'un lobby
+  async getLobbyPlayers(lobbyId: string) {
+    return await prisma.lobbyPlayer.findMany({
+      where: { lobbyId },
+      include: {
+        user: true,
+      },
+    });
+  },
+
+  // Obtenir le statut d'un joueur dans un lobby
+  async getPlayerStatus(lobbyId: string, userId: string) {
+    const player = await prisma.lobbyPlayer.findUnique({
+      where: {
+        lobbyId_userId: {
+          lobbyId,
+          userId,
+        },
+      },
+    });
+    return player?.status || null;
+  },
+
+  // Obtenir les données de jeu d'un joueur
+  async getPlayerGameData(lobbyId: string, userId: string) {
+    const player = await prisma.lobbyPlayer.findUnique({
+      where: {
+        lobbyId_userId: {
+          lobbyId,
+          userId,
+        },
+      },
+    });
+    return player
+      ? {
+          score: player.score || 0,
+          progress: player.progress || 0,
+          validatedCountries: player.validatedCountries || [],
+          incorrectCountries: player.incorrectCountries || [],
+        }
+      : null;
+  },
+
   // Générer un ID unique
   generateId() {
     return `test-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -171,5 +250,32 @@ export const testUtils = {
     } catch (error) {
       console.log({ error });
     }
+  },
+
+  async findPlayerInLobby(lobbyId: string, playerId: string) {
+    return await prisma.lobbyPlayer.findUnique({
+      where: {
+        lobbyId_userId: {
+          lobbyId,
+          userId: playerId,
+        },
+      },
+      include: {
+        user: {
+          select: { id: true, name: true },
+        },
+      },
+    });
+  },
+
+  async findPlayersInLobby(lobbyId: string) {
+    return await prisma.lobbyPlayer.findMany({
+      where: { lobbyId },
+      include: {
+        user: {
+          select: { id: true, name: true },
+        },
+      },
+    });
   },
 };

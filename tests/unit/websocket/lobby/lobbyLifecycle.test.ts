@@ -22,14 +22,21 @@ describe("LobbyLifecycleManager", () => {
       const lobbyId = "test-lobby-id";
       const delayMs = 5000;
 
+      // Créer un lobby d'abord
+      LobbyLifecycleManager.createLobby(lobbyId, "host-id", "Host", {});
+      expect(LobbyLifecycleManager.getLobbyInMemory(lobbyId)).toBeTruthy();
+
       LobbyLifecycleManager.scheduleLobbyDeletion(lobbyId, delayMs);
 
-      // Vérifier que la fonction ne lance pas d'erreur
-      expect(true).toBe(true);
+      // Vérifier que le lobby existe toujours immédiatement après la programmation
+      expect(LobbyLifecycleManager.getLobbyInMemory(lobbyId)).toBeTruthy();
     });
 
     it("ne devrait pas programmer la suppression si un timer existe déjà", () => {
       const lobbyId = "test-lobby-id";
+
+      // Créer un lobby d'abord
+      LobbyLifecycleManager.createLobby(lobbyId, "host-id", "Host", {});
 
       // Premier appel
       LobbyLifecycleManager.scheduleLobbyDeletion(lobbyId);
@@ -37,8 +44,8 @@ describe("LobbyLifecycleManager", () => {
       // Deuxième appel - ne devrait pas créer un nouveau timer
       LobbyLifecycleManager.scheduleLobbyDeletion(lobbyId);
 
-      // Vérifier que la fonction ne lance pas d'erreur
-      expect(true).toBe(true);
+      // Vérifier que le lobby existe toujours
+      expect(LobbyLifecycleManager.getLobbyInMemory(lobbyId)).toBeTruthy();
     });
   });
 
@@ -46,58 +53,49 @@ describe("LobbyLifecycleManager", () => {
     it("devrait annuler la suppression différée d'un lobby", () => {
       const lobbyId = "test-lobby-id";
 
+      // Créer un lobby d'abord
+      LobbyLifecycleManager.createLobby(lobbyId, "host-id", "Host", {});
+
       // Programmer la suppression
       LobbyLifecycleManager.scheduleLobbyDeletion(lobbyId);
 
       // Annuler la suppression
       LobbyLifecycleManager.cancelLobbyDeletion(lobbyId);
 
-      // Vérifier que la fonction ne lance pas d'erreur
-      expect(true).toBe(true);
+      // Vérifier que le lobby existe toujours
+      expect(LobbyLifecycleManager.getLobbyInMemory(lobbyId)).toBeTruthy();
     });
 
     it("ne devrait rien faire si aucun timer n'existe", () => {
       const lobbyId = "test-lobby-id";
 
+      // Ne pas créer de lobby, juste essayer d'annuler
       LobbyLifecycleManager.cancelLobbyDeletion(lobbyId);
 
-      // Vérifier que la fonction ne lance pas d'erreur
-      expect(true).toBe(true);
+      // Vérifier qu'aucune erreur n'est levée
+      expect(LobbyLifecycleManager.getLobbyInMemory(lobbyId)).toBeNull();
     });
   });
 
   describe("createLobby", () => {
-    it("devrait créer un nouveau lobby en mémoire", () => {
+    it("devrait créer un lobby avec les paramètres fournis", () => {
       const lobbyId = "test-lobby-id";
       const hostId = "host-id";
-      const hostName = "Host Name";
+      const hostName = "Test Host";
       const settings = { totalQuestions: 10 };
 
-      const mockPlayer = {
-        name: hostName,
-        status: "ready",
-        score: 0,
-        progress: 0,
-        validatedCountries: [],
-        incorrectCountries: [],
-      };
-
-      mockPlayerService.createPlayer.mockReturnValue(mockPlayer);
-
-      const result = LobbyLifecycleManager.createLobby(
-        lobbyId,
-        hostId,
-        hostName,
-        settings
-      );
-
-      expect(result).toEqual({
-        lobbyId,
-        hostId,
-        settings,
-      });
+      LobbyLifecycleManager.createLobby(lobbyId, hostId, hostName, settings);
 
       expect(mockPlayerService.createPlayer).toHaveBeenCalledWith(hostName);
+
+      // Vérifier que le lobby a été créé en mémoire
+      const createdLobby = LobbyLifecycleManager.getLobbyInMemory(lobbyId);
+      expect(createdLobby).toBeDefined();
+      expect(createdLobby.hostId).toBe(hostId);
+      expect(createdLobby.settings).toEqual(settings);
+      expect(createdLobby.players.has(hostId)).toBe(true);
+      expect(createdLobby.players.get(hostId)?.name).toBe(hostName);
+      expect(createdLobby.players.get(hostId)?.status).toBe("joined");
     });
   });
 
@@ -172,6 +170,8 @@ describe("LobbyLifecycleManager", () => {
       const restoredLobby = LobbyLifecycleManager.getLobbyInMemory(lobbyId);
       expect(restoredLobby).toBeDefined();
       expect(restoredLobby.players.size).toBe(0);
+      expect(restoredLobby.hostId).toBe("host-id");
+      expect(restoredLobby.settings).toEqual({ totalQuestions: 10 });
     });
 
     it("devrait gérer les lobbies sans données de joueurs", () => {
@@ -187,6 +187,7 @@ describe("LobbyLifecycleManager", () => {
       const restoredLobby = LobbyLifecycleManager.getLobbyInMemory(lobbyId);
       expect(restoredLobby).toBeDefined();
       expect(restoredLobby.players.size).toBe(0);
+      expect(restoredLobby.hostId).toBe("host-id");
     });
 
     it("devrait gérer les joueurs avec des données manquantes", () => {
@@ -234,6 +235,7 @@ describe("LobbyLifecycleManager", () => {
       const lobby = LobbyLifecycleManager.getLobbyInMemory(lobbyId);
       expect(lobby).toBeDefined();
       expect(lobby.settings).toEqual(settings);
+      expect(lobby.hostId).toBe("host-id");
     });
 
     it("devrait retourner null si le lobby n'existe pas", () => {
@@ -255,6 +257,8 @@ describe("LobbyLifecycleManager", () => {
       expect(activeLobbies.size).toBe(2);
       expect(activeLobbies.has("lobby1")).toBe(true);
       expect(activeLobbies.has("lobby2")).toBe(true);
+      expect(activeLobbies.get("lobby1")?.hostId).toBe("host1");
+      expect(activeLobbies.get("lobby2")?.hostId).toBe("host2");
     });
 
     it("devrait retourner une Map vide s'il n'y a pas de lobbies", () => {

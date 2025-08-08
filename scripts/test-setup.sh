@@ -7,6 +7,7 @@ set -e
 # Analyser les arguments
 JEST_ARGS=""
 WATCH_MODE=false
+TEST_TYPE="all"
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -24,18 +25,22 @@ while [[ $# -gt 0 ]]; do
       shift
       ;;
     --unit)
+      TEST_TYPE="unit"
       JEST_ARGS="$JEST_ARGS --testPathPatterns=unit"
       shift
       ;;
     --integration)
+      TEST_TYPE="integration"
       JEST_ARGS="$JEST_ARGS --testPathPatterns=integration"
       shift
       ;;
     --e2e)
+      TEST_TYPE="e2e"
       JEST_ARGS="$JEST_ARGS --testPathPatterns=e2e"
       shift
       ;;
     --performance)
+      TEST_TYPE="performance"
       JEST_ARGS="$JEST_ARGS --testPathPatterns=performance"
       shift
       ;;
@@ -45,6 +50,7 @@ while [[ $# -gt 0 ]]; do
       ;;
     *)
       echo "Argument inconnu: $1"
+      echo "Usage: $0 [--ci] [--watch] [--coverage] [--unit] [--integration] [--e2e] [--performance] [--debug]"
       exit 1
       ;;
   esac
@@ -92,9 +98,11 @@ npm run db:generate
 echo "📦 Application des migrations..."
 npm run db:push
 
+# Afficher le type de test en cours
+echo "🚀 Lancement des tests de type: $TEST_TYPE"
 
-
-echo "🚀 Lancement des tests avec Jest..."
+# Lancer les tests avec Jest
+echo "🧪 Exécution des tests avec Jest..."
 npx jest $JEST_ARGS
 
 # Nettoyer seulement si pas en mode watch

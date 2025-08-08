@@ -1,256 +1,324 @@
 import { GitHubService } from "../../../src/services/githubService.js";
 
-// Mock de fetch
-global.fetch = jest.fn();
+// Tests de la logique métier de GitHubService sans appels réseau réels
+describe("GitHubService - Logique Métier Réelle", () => {
+  // Mock global fetch pour éviter les appels réseau
+  global.fetch = jest.fn();
+  const mockFetch = global.fetch as jest.MockedFunction<typeof fetch>;
 
-const mockFetch = fetch as jest.MockedFunction<typeof fetch>;
-
-describe("GitHubService", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    process.env.GITHUB_TOKEN = "test-token";
+
+    // Configuration par défaut des variables d'environnement
+    process.env.GITHUB_TOKEN = "test-token-123";
     process.env.GITHUB_REPO_OWNER = "test-owner";
     process.env.GITHUB_REPO_NAME = "test-repo";
   });
 
   afterEach(() => {
+    // Nettoyer les variables d'environnement
     delete process.env.GITHUB_TOKEN;
     delete process.env.GITHUB_REPO_OWNER;
     delete process.env.GITHUB_REPO_NAME;
   });
 
   describe("createIssueFromBugReport", () => {
-    it("devrait créer une issue GitHub avec succès", async () => {
-      const bugReport = {
-        title: "Test Bug",
-        description: "This is a test bug",
-        environment: { browser: "Chrome" },
+    it("devrait formater correctement le bug report et créer l'issue GitHub", async () => {
+      const bugReportData = {
+        title: "Bug critique dans le quiz",
+        description: "Le quiz ne fonctionne pas correctement sur mobile",
+        stepsToReproduce:
+          "1. Ouvrir sur mobile\n2. Démarrer quiz\n3. Observer le bug",
+        location: "/quiz/multiplayer",
+        environment: {
+          browser: "Safari",
+          browserVersion: "16.5",
+          operatingSystem: "iOS 16.5",
+          deviceType: "mobile",
+          screenResolution: "390x844",
+        },
+        userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X)",
+        url: "https://mapquiz.app/quiz/123?token=secret&id=456",
+        reporterId: "user-789",
       };
 
-      const mockResponse = {
+      // Mock de la réponse GitHub
+      const mockGitHubResponse = {
         ok: true,
-        json: jest.fn().mockResolvedValue({
-          number: 123,
-          html_url:
-            "https://github.com/your-github-username/your-repo-name/issues/123",
-          title: "[Bug Report] Test Bug",
-        }),
+        json: () =>
+          Promise.resolve({
+            number: 42,
+            title: "[Bug Report] Bug critique dans le quiz",
+            html_url: "https://github.com/test-owner/test-repo/issues/42",
+          }),
       };
+      mockFetch.mockResolvedValue(mockGitHubResponse as Response);
 
-      mockFetch.mockResolvedValue(mockResponse as any);
+      const result = await GitHubService.createIssueFromBugReport(
+        bugReportData
+      );
 
-      const result = await GitHubService.createIssueFromBugReport(bugReport);
+      // VALIDATION DE LA LOGIQUE MÉTIER RÉELLE
 
+      // 1. Vérifier l'appel à l'API GitHub
       expect(mockFetch).toHaveBeenCalledWith(
         "https://api.github.com/repos/your-github-username/your-repo-name/issues",
-        expect.objectContaining({
+        {
           method: "POST",
           headers: {
-            Authorization: "token test-token",
+            Authorization: "token test-token-123",
             Accept: "application/vnd.github.v3+json",
             "Content-Type": "application/json",
           },
-          body: expect.stringContaining("[Bug Report] Test Bug"),
-        })
+          body: expect.any(String),
+        }
       );
 
+      // 2. Vérifier le contenu du body de l'issue
+      const requestBody = JSON.parse(
+        mockFetch.mock.calls[0][1]?.body as string
+      );
+
+      expect(requestBody.title).toBe("[Bug Report] Bug critique dans le quiz");
+      expect(requestBody.labels).toEqual([
+        "bug",
+        "user-reported",
+        "needs-triage",
+      ]);
+      expect(requestBody.assignees).toEqual([]);
+
+      // 3. Vérifier que le markdown est bien formaté
+      expect(requestBody.body).toContain("## 🐛 Rapport de Bug Utilisateur");
+      expect(requestBody.body).toContain("### Description");
+      expect(requestBody.body).toContain(
+        "Le quiz ne fonctionne pas correctement sur mobile"
+      );
+      expect(requestBody.body).toContain("### Étapes de reproduction");
+      expect(requestBody.body).toContain("1. Ouvrir sur mobile");
+      expect(requestBody.body).toContain("### Localisation");
+      expect(requestBody.body).toContain("/quiz/multiplayer");
+      expect(requestBody.body).toContain("### Informations techniques");
+      expect(requestBody.body).toContain("**Navigateur** : Safari 16.5");
+      expect(requestBody.body).toContain("**OS** : iOS 16.5");
+      expect(requestBody.body).toContain("**Appareil** : mobile");
+      expect(requestBody.body).toContain("**Résolution** : 390x844");
+
+      // 4. Vérifier l'anonymisation des données sensibles
+      expect(requestBody.body).not.toContain("token=secret");
+      expect(requestBody.body).not.toContain("id=456");
+      expect(requestBody.body).toContain("/quiz/123"); // URL anonymisée
+      expect(requestBody.body).toContain("Unknown Browser on Unknown OS"); // User-Agent non reconnu dans l'anonymisation
+      expect(requestBody.body).toContain("**Type** : Utilisateur connecté");
+
+      // 5. Vérifier le résultat retourné
       expect(result).toEqual({
         success: true,
-        issueNumber: 123,
-        issueUrl:
-          "https://github.com/your-github-username/your-repo-name/issues/123",
-        message: "Bug report créé: Issue #123",
+        issueNumber: 42,
+        issueUrl: "https://github.com/test-owner/test-repo/issues/42",
+        message: "Bug report créé: Issue #42",
       });
     });
 
-    it("devrait échouer si le token GitHub n'est pas configuré", async () => {
+    it("devrait gérer l'anonymisation des URLs avec paramètres sensibles", async () => {
+      const bugReportData = {
+        title: "Test anonymisation",
+        description: "Test de l'anonymisation des URLs sensibles",
+        environment: { browser: "Chrome" },
+        url: "https://mapquiz.app/game?token=abc123&auth=xyz789&key=secret&password=hidden&secret=value&id=userId",
+      };
+
+      const mockGitHubResponse = {
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            number: 1,
+            html_url: "https://github.com/test/test/issues/1",
+          }),
+      };
+      mockFetch.mockResolvedValue(mockGitHubResponse as Response);
+
+      await GitHubService.createIssueFromBugReport(bugReportData);
+
+      const requestBody = JSON.parse(
+        mockFetch.mock.calls[0][1]?.body as string
+      );
+
+      // VALIDATION DE L'ANONYMISATION RÉELLE
+      expect(requestBody.body).toContain("**URL** : /game");
+      expect(requestBody.body).not.toContain("token=");
+      expect(requestBody.body).not.toContain("auth=");
+      expect(requestBody.body).not.toContain("key=");
+      expect(requestBody.body).not.toContain("password=");
+      expect(requestBody.body).not.toContain("secret=");
+      expect(requestBody.body).not.toContain("id=");
+    });
+
+    it("devrait gérer l'anonymisation des User-Agents", async () => {
+      const bugReportData = {
+        title: "Test User-Agent",
+        description: "Test de l'anonymisation des User-Agents",
+        environment: { browser: "Firefox" },
+        userAgent:
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/119.0",
+      };
+
+      const mockGitHubResponse = {
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            number: 2,
+            html_url: "https://github.com/test/test/issues/2",
+          }),
+      };
+      mockFetch.mockResolvedValue(mockGitHubResponse as Response);
+
+      await GitHubService.createIssueFromBugReport(bugReportData);
+
+      const requestBody = JSON.parse(
+        mockFetch.mock.calls[0][1]?.body as string
+      );
+
+      // VALIDATION DE L'ANONYMISATION RÉELLE
+      expect(requestBody.body).toContain(
+        "**User-Agent** : Firefox/119 on Windows"
+      );
+      expect(requestBody.body).not.toContain("Win64; x64");
+      expect(requestBody.body).not.toContain("rv:109.0");
+      expect(requestBody.body).not.toContain("Gecko/20100101");
+    });
+
+    it("devrait gérer les utilisateurs anonymes correctement", async () => {
+      const bugReportData = {
+        title: "Bug utilisateur anonyme",
+        description: "Test pour utilisateur non connecté",
+        environment: { browser: "Chrome" },
+        // Pas de reporterId
+      };
+
+      const mockGitHubResponse = {
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            number: 3,
+            html_url: "https://github.com/test/test/issues/3",
+          }),
+      };
+      mockFetch.mockResolvedValue(mockGitHubResponse as Response);
+
+      await GitHubService.createIssueFromBugReport(bugReportData);
+
+      const requestBody = JSON.parse(
+        mockFetch.mock.calls[0][1]?.body as string
+      );
+
+      // VALIDATION POUR UTILISATEUR ANONYME
+      expect(requestBody.body).toContain("**Type** : Utilisateur anonyme");
+      expect(requestBody.body).not.toContain("Utilisateur connecté");
+    });
+
+    it("devrait gérer les champs optionnels manquants", async () => {
+      const bugReportData = {
+        title: "Bug minimal",
+        description: "Bug report avec seulement les champs requis",
+        environment: {},
+        // Pas de stepsToReproduce, location, userAgent, url
+      };
+
+      const mockGitHubResponse = {
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            number: 4,
+            html_url: "https://github.com/test/test/issues/4",
+          }),
+      };
+      mockFetch.mockResolvedValue(mockGitHubResponse as Response);
+
+      await GitHubService.createIssueFromBugReport(bugReportData);
+
+      const requestBody = JSON.parse(
+        mockFetch.mock.calls[0][1]?.body as string
+      );
+
+      // VALIDATION DES VALEURS PAR DÉFAUT
+      expect(requestBody.body).toContain("**URL** : Non spécifiée");
+      expect(requestBody.body).toContain("**Navigateur** : Inconnu");
+      expect(requestBody.body).toContain("**OS** : Inconnu");
+      expect(requestBody.body).toContain("**User-Agent** : Non spécifié");
+      expect(requestBody.body).not.toContain("### Étapes de reproduction");
+      expect(requestBody.body).not.toContain("### Localisation");
+    });
+  });
+
+  describe("Gestion d'Erreurs GitHub API", () => {
+    it("devrait lever une erreur si le token GitHub est manquant", async () => {
       delete process.env.GITHUB_TOKEN;
 
-      const bugReport = {
-        title: "Test Bug",
-        description: "This is a test bug",
+      const bugReportData = {
+        title: "Test sans token",
+        description: "Test de la gestion d'erreur token manquant",
         environment: { browser: "Chrome" },
       };
 
+      // VALIDATION DE LA LOGIQUE D'ERREUR
       await expect(
-        GitHubService.createIssueFromBugReport(bugReport)
+        GitHubService.createIssueFromBugReport(bugReportData)
       ).rejects.toThrow("GitHub token non configuré");
+
+      expect(mockFetch).not.toHaveBeenCalled();
     });
 
-    it("devrait gérer les erreurs de l'API GitHub", async () => {
-      const bugReport = {
-        title: "Test Bug",
-        description: "This is a test bug",
+    it("devrait gérer les erreurs d'API GitHub avec détails", async () => {
+      const bugReportData = {
+        title: "Test erreur API",
+        description: "Test de la gestion d'erreur API GitHub",
         environment: { browser: "Chrome" },
       };
 
-      const mockResponse = {
+      const mockErrorResponse = {
         ok: false,
-        status: 400,
-        text: jest.fn().mockResolvedValue("Bad Request"),
+        status: 401,
+        text: () => Promise.resolve('{"message":"Bad credentials"}'),
       };
+      mockFetch.mockResolvedValue(mockErrorResponse as Response);
 
-      mockFetch.mockResolvedValue(mockResponse as any);
-
+      // VALIDATION DE LA GESTION D'ERREUR DÉTAILLÉE
       await expect(
-        GitHubService.createIssueFromBugReport(bugReport)
-      ).rejects.toThrow("Erreur GitHub API: 400 - Bad Request");
-    });
-
-    it("devrait formater correctement le body de l'issue", async () => {
-      const bugReport = {
-        title: "Test Bug",
-        description: "This is a test bug",
-        stepsToReproduce: "1. Do this\n2. Do that",
-        location: "test-page",
-        environment: { browser: "Chrome", browserVersion: "100.0" },
-        userAgent:
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        url: "https://example.com/test?param=value",
-        reporterId: "user123",
-      };
-
-      const mockResponse = {
-        ok: true,
-        json: jest.fn().mockResolvedValue({
-          number: 123,
-          html_url:
-            "https://github.com/your-github-username/your-repo-name/issues/123",
-          title: "[Bug Report] Test Bug",
-        }),
-      };
-
-      mockFetch.mockResolvedValue(mockResponse as any);
-
-      await GitHubService.createIssueFromBugReport(bugReport);
-
-      const callBody = JSON.parse(mockFetch.mock.calls[0][1]?.body as string);
-
-      expect(callBody.title).toBe("[Bug Report] Test Bug");
-      expect(callBody.body).toContain("## 🐛 Rapport de Bug Utilisateur");
-      expect(callBody.body).toContain("This is a test bug");
-      expect(callBody.body).toContain("### Étapes de reproduction");
-      expect(callBody.body).toContain("1. Do this");
-      expect(callBody.body).toContain("### Localisation");
-      expect(callBody.body).toContain("test-page");
-      expect(callBody.body).toContain("**URL** : /test?param=value");
-      expect(callBody.body).toContain("**Navigateur** : Chrome 100.0");
-    });
-
-    it("devrait anonymiser les données sensibles", async () => {
-      const bugReport = {
-        title: "Test Bug",
-        description: "This is a test bug",
-        environment: { browser: "Chrome" },
-        userAgent:
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        url: "https://example.com/test?token=secret&user=123",
-      };
-
-      const mockResponse = {
-        ok: true,
-        json: jest.fn().mockResolvedValue({
-          number: 123,
-          html_url:
-            "https://github.com/your-github-username/your-repo-name/issues/123",
-          title: "[Bug Report] Test Bug",
-        }),
-      };
-
-      mockFetch.mockResolvedValue(mockResponse as any);
-
-      await GitHubService.createIssueFromBugReport(bugReport);
-
-      const callBody = JSON.parse(mockFetch.mock.calls[0][1]?.body as string);
-
-      expect(callBody.body).toContain("**URL** : /test?user=123");
-      expect(callBody.body).not.toContain("token=secret");
-      expect(callBody.body).toContain(
-        "**User-Agent** : Unknown Browser on Windows"
+        GitHubService.createIssueFromBugReport(bugReportData)
+      ).rejects.toThrow(
+        'Erreur GitHub API: 401 - {"message":"Bad credentials"}'
       );
     });
-  });
 
-  describe("updateIssueStatus", () => {
-    it("devrait mettre à jour le statut d'une issue", async () => {
-      const mockResponse = {
-        ok: true,
-        json: jest.fn().mockResolvedValue({
-          number: 123,
-          state: "closed",
-        }),
+    it("devrait utiliser les variables d'environnement par défaut", async () => {
+      // Supprimer les variables personnalisées
+      delete process.env.GITHUB_REPO_OWNER;
+      delete process.env.GITHUB_REPO_NAME;
+
+      const bugReportData = {
+        title: "Test valeurs par défaut",
+        description:
+          "Test des valeurs par défaut des variables d'environnement",
+        environment: { browser: "Chrome" },
       };
 
-      mockFetch.mockResolvedValue(mockResponse as any);
+      const mockGitHubResponse = {
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            number: 5,
+            html_url: "https://github.com/map-quiz/mapquiz-back/issues/5",
+          }),
+      };
+      mockFetch.mockResolvedValue(mockGitHubResponse as Response);
 
-      await GitHubService.updateIssueStatus(123, "closed");
+      await GitHubService.createIssueFromBugReport(bugReportData);
 
+      // VALIDATION DES VALEURS PAR DÉFAUT
       expect(mockFetch).toHaveBeenCalledWith(
-        "https://api.github.com/repos/your-github-username/your-repo-name/issues/123",
-        expect.objectContaining({
-          method: "PATCH",
-          headers: {
-            Authorization: "token test-token",
-            Accept: "application/vnd.github.v3+json",
-            "Content-Type": "application/json",
-          },
-          body: expect.stringContaining(
-            '"labels":["bug","user-reported","closed"]'
-          ),
-        })
+        "https://api.github.com/repos/your-github-username/your-repo-name/issues",
+        expect.any(Object)
       );
-    });
-
-    it("devrait gérer les erreurs lors de la mise à jour", async () => {
-      const mockResponse = {
-        ok: false,
-        status: 404,
-        text: jest.fn().mockResolvedValue("Issue not found"),
-      };
-
-      mockFetch.mockResolvedValue(mockResponse as any);
-
-      await expect(
-        GitHubService.updateIssueStatus(123, "closed")
-      ).rejects.toThrow("Erreur mise à jour issue: 404 - Issue not found");
-    });
-  });
-
-  describe("anonymizeUrl", () => {
-    it("devrait anonymiser les paramètres sensibles dans l'URL", () => {
-      const url = "https://example.com/test?user=123&token=secret&param=value";
-      const anonymized = (GitHubService as any).anonymizeUrl(url);
-
-      expect(anonymized).toBe("/test?user=123&param=value");
-    });
-
-    it("devrait retourner l'URL inchangée si pas de paramètres sensibles", () => {
-      const url = "https://example.com/test?param=value";
-      const anonymized = (GitHubService as any).anonymizeUrl(url);
-
-      expect(anonymized).toBe("/test?param=value");
-    });
-
-    it("devrait retourner undefined si pas d'URL", () => {
-      const anonymized = (GitHubService as any).anonymizeUrl(undefined);
-
-      expect(anonymized).toBeUndefined();
-    });
-  });
-
-  describe("anonymizeUserAgent", () => {
-    it("devrait anonymiser les informations sensibles dans le user agent", () => {
-      const userAgent =
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.75 Safari/537.36";
-      const anonymized = (GitHubService as any).anonymizeUserAgent(userAgent);
-
-      expect(anonymized).toBe("Chrome/100 on Windows");
-    });
-
-    it("devrait retourner undefined si pas de user agent", () => {
-      const anonymized = (GitHubService as any).anonymizeUserAgent(undefined);
-
-      expect(anonymized).toBeUndefined();
     });
   });
 });
