@@ -96,7 +96,7 @@ export const handleJoinLobby = async (payload: any, userId: string) => {
   }
 
   if (!lobby) {
-    return { success: false };
+    return { success: false, message: "Lobby non trouvé" };
   }
 
   // Si le lobby était vide et en attente de suppression, on annule le timer

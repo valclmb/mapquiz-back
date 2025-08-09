@@ -56,7 +56,7 @@ describe("HTTP Error Handling Integration Tests", () => {
         method: "GET",
         url: "/api/scores/history",
         headers: {
-          authorization: `Bearer ${testUser.id}`,
+          "x-user-id": testUser.id,
         },
       });
 
@@ -100,7 +100,7 @@ describe("HTTP Error Handling Integration Tests", () => {
           method: "GET",
           url: "/api/scores/history",
           headers: {
-            authorization: `Bearer ${testUser.id}`,
+            "x-user-id": testUser.id,
           },
         })
       );

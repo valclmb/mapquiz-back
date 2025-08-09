@@ -15,6 +15,16 @@ describe("LobbyLifecycleManager", () => {
     // Nettoyer les lobbies entre les tests
     const activeLobbies = LobbyLifecycleManager.getAllActiveLobbies();
     activeLobbies.clear();
+
+    // Mock par défaut pour PlayerService.createPlayer
+    mockPlayerService.createPlayer.mockImplementation((name: string) => ({
+      status: "joined",
+      score: 0,
+      progress: 0,
+      name,
+      validatedCountries: [],
+      incorrectCountries: [],
+    }));
   });
 
   describe("scheduleLobbyDeletion", () => {
