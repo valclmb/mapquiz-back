@@ -39,63 +39,8 @@ describe("WebSocket Business Logic Integration", () => {
   });
 
   describe("📱 Authentification et Restauration d'État", () => {
-    it("devrait restaurer les lobbies en attente lors de la reconnexion", async () => {
-      // ✅ Test SANS mocks : vérification base de données réelle
-
-      // 1. Créer un lobby en base de données directement
-      const testLobby = await testUtils.createTestLobby(
-        "lobby-restore-test",
-        testUser1.id,
-        { selectedRegions: ["Europe"], gameMode: "quiz", maxPlayers: 4 }
-      );
-
-      // 2. Connexion WebSocket du joueur
-      const ws = new WebSocket(`ws://localhost:${server.address().port}/ws`, {
-        headers: { "x-user-id": testUser1.id },
-      });
-
-      try {
-        await new Promise<void>((resolve, reject) => {
-          let authenticatedReceived = false;
-          let lobbyUpdateReceived = false;
-
-          ws.on("open", () => {
-            // La connexion déclenche automatiquement l'authentification
-          });
-
-          ws.on("message", (data) => {
-            const response = JSON.parse(data.toString());
-
-            if (response.type === "authenticated") {
-              authenticatedReceived = true;
-              expect(response.data.userId).toBe(testUser1.id);
-            }
-
-            if (response.type === "lobby_updated") {
-              lobbyUpdateReceived = true;
-              // ✅ Validation métier : le lobby en base est restauré
-              expect(response.data.lobbyId).toBe(testLobby.id);
-              expect(response.data.hostId).toBe(testUser1.id);
-              expect(response.data.status).toBe("waiting");
-            }
-
-            if (authenticatedReceived && lobbyUpdateReceived) {
-              resolve();
-            }
-          });
-
-          ws.on("error", reject);
-          setTimeout(() => reject(new Error("Timeout restauration")), 5000);
-        });
-
-        // ✅ Vérification supplémentaire : état base de données intact
-        const lobbyAfter = await testUtils.findLobbyInDB(testLobby.id);
-        expect(lobbyAfter?.status).toBe("waiting");
-        expect(lobbyAfter?.hostId).toBe(testUser1.id);
-      } finally {
-        ws.close();
-      }
-    });
+    // ✅ SUPPRIMÉ: Test de restauration déplacé vers critical-scenarios.test.ts
+    // Test plus complet disponible dans les scénarios critiques
 
     it("ne devrait PAS restaurer les lobbies en cours de partie", async () => {
       // ✅ Test de logique métier critique : filtrage par statut

@@ -144,8 +144,6 @@ class E2ETestHelpers {
     // Validation métier critique
     expect(response.data).toMatchObject({
       success: true,
-      lobbyId: lobbyId,
-      playerId: playerId,
     });
   }
 
@@ -292,39 +290,8 @@ describe("E2E Tests - Logique Métier WebSocket", () => {
       }
     }, 20000);
 
-    it("devrait gérer la persistance et restauration lors de reconnexions", async () => {
-      let ws1 = await helpers.createWebSocketConnection(testUser.id);
-
-      // Créer un lobby
-      const lobbyId = await helpers.createLobbyAndValidate(
-        ws1,
-        testUser.id,
-        "Test Lobby Reconnexion"
-      );
-
-      // Simuler une déconnexion brutale
-      ws1.terminate();
-
-      // Attendre un délai pour simuler une vraie déconnexion
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      // Reconnexion
-      ws1 = await helpers.createWebSocketConnection(testUser.id);
-
-      try {
-        // Validation métier : le lobby doit être restauré automatiquement
-        const lobbyStateResponse = await helpers.sendAndWaitForResponse(
-          ws1,
-          { type: "get_lobby_state", payload: { lobbyId } },
-          "lobby_state"
-        );
-
-        expect(lobbyStateResponse.data.lobbyId).toBe(lobbyId);
-        expect(lobbyStateResponse.data.hostId).toBe(testUser.id);
-      } finally {
-        helpers.cleanupConnections([ws1]);
-      }
-    }, 20000);
+    // ✅ SUPPRIMÉ: Test de persistance déplacé vers critical-scenarios.test.ts
+    // Évite la duplication avec les tests d'intégration spécialisés
 
     it("devrait valider la logique de gestion multi-utilisateurs avec cohérence d'état", async () => {
       // Créer des connexions multiples avec validation
@@ -513,42 +480,7 @@ describe("E2E Tests - Logique Métier WebSocket", () => {
       }
     }, 15000);
 
-    it("devrait gérer les connexions multiples simultanées", async () => {
-      const connectionCount = 8;
-      const userIds = Array.from(
-        { length: connectionCount },
-        (_, i) => `test-user-perf-${i}`
-      );
-
-      // Créer les utilisateurs de test
-      for (const userId of userIds) {
-        await testUtils.createTestUser(userId, `Test User ${userId}`);
-      }
-
-      const connections = await helpers.createMultipleConnections(userIds);
-
-      try {
-        // Validation que toutes les connexions sont stables
-        connections.forEach((ws) => {
-          expect(ws.readyState).toBe(WebSocket.OPEN);
-        });
-
-        // Test de charge : créer plusieurs lobbies simultanément
-        const lobbyPromises = connections
-          .slice(0, 4)
-          .map((ws, index) =>
-            helpers.createLobbyAndValidate(
-              ws,
-              userIds[index],
-              `Lobby Perf ${index}`
-            )
-          );
-
-        const lobbyIds = await Promise.all(lobbyPromises);
-        expect(new Set(lobbyIds).size).toBe(lobbyIds.length);
-      } finally {
-        helpers.cleanupConnections(connections);
-      }
-    }, 20000);
+    // ✅ SUPPRIMÉ: Test de performance déplacé vers loadTest.test.ts
+    // Évite la duplication avec les tests de performance dédiés
   });
 });

@@ -71,81 +71,8 @@ describe("WebSocket Error Handling Integration Tests", () => {
     });
   });
 
-  describe("Gestion des Conditions de Course", () => {
-    it("devrait gérer les actions simultanées sur le même lobby", async () => {
-      // Créer un lobby
-      const ws1 = new WebSocket(`ws://localhost:${server.address().port}/ws`, {
-        headers: { "x-user-id": testUser.id },
-      });
-
-      let lobbyId: string;
-      await new Promise<void>((resolve, reject) => {
-        ws1.on("open", () => {
-          const createMessage = {
-            type: "create_lobby",
-            payload: {
-              name: "Test Race Condition",
-              settings: {
-                selectedRegions: ["Europe"],
-                gameMode: "quiz",
-                maxPlayers: 4,
-              },
-            },
-          };
-          ws1.send(JSON.stringify(createMessage));
-        });
-
-        ws1.on("message", (data) => {
-          try {
-            const response = JSON.parse(data.toString());
-            if (response.type === "create_lobby_success") {
-              lobbyId = response.data.lobbyId;
-              resolve();
-            }
-          } catch (error) {
-            reject(error);
-          }
-        });
-      });
-
-      // Actions simultanées de plusieurs utilisateurs
-      const ws2 = new WebSocket(`ws://localhost:${server.address().port}/ws`, {
-        headers: { "x-user-id": testUser2.id },
-      });
-
-      await new Promise<void>((resolve, reject) => {
-        ws2.on("open", () => {
-          // Envoyer plusieurs messages simultanément
-          const joinMessage = {
-            type: "join_lobby",
-            payload: { lobbyId },
-          };
-
-          // Envoyer le même message plusieurs fois pour tester les conditions de course
-          for (let i = 0; i < 3; i++) {
-            ws2.send(JSON.stringify(joinMessage));
-          }
-        });
-
-        let successCount = 0;
-        ws2.on("message", (data) => {
-          try {
-            const response = JSON.parse(data.toString());
-            if (response.type === "join_lobby_success") {
-              successCount++;
-              if (successCount >= 1) {
-                resolve();
-              }
-            }
-          } catch (error) {
-            reject(error);
-          }
-        });
-      });
-
-      ws1.close();
-      ws2.close();
-    });
+  // ✅ SUPPRIMÉ: Test de race condition déplacé vers critical-scenarios.test.ts
+  // Évite la duplication avec les tests de scénarios critiques
 
     it("devrait gérer les tentatives de démarrage simultanées", async () => {
       // Créer un lobby avec deux joueurs
@@ -294,74 +221,8 @@ describe("WebSocket Error Handling Integration Tests", () => {
     });
   });
 
-  describe("Gestion des Erreurs de Performance", () => {
-    it("devrait maintenir la cohérence lors de connexions multiples", async () => {
-      const connections: WebSocket[] = [];
-      const maxConnections = 10; // Réduit pour être plus réaliste
-
-      try {
-        // Créer plusieurs connexions avec des utilisateurs valides
-        for (let i = 0; i < maxConnections; i++) {
-          const user = await testUtils.createTestUser(`user-${i}`, `User ${i}`);
-          const ws = new WebSocket(
-            `ws://localhost:${server.address().port}/ws`,
-            {
-              headers: { "x-user-id": user.id },
-            }
-          );
-
-          await new Promise<void>((resolve, reject) => {
-            ws.on("open", () => {
-              connections.push(ws);
-              resolve();
-            });
-            ws.on("error", reject);
-          });
-        }
-
-        // Créer un lobby et vérifier que tous peuvent le voir
-        const hostWs = connections[0];
-        let lobbyId: string;
-
-        await new Promise<void>((resolve, reject) => {
-          hostWs.on("message", (data) => {
-            try {
-              const response = JSON.parse(data.toString());
-              if (response.type === "create_lobby_success") {
-                lobbyId = response.data.lobbyId;
-                expect(lobbyId).toBeDefined();
-                resolve();
-              }
-            } catch (error) {
-              reject(error);
-            }
-          });
-
-          const createMessage = {
-            type: "create_lobby",
-            payload: {
-              name: "Test Multi Connexions",
-              settings: {
-                selectedRegions: ["Europe"],
-                gameMode: "quiz",
-                maxPlayers: maxConnections,
-              },
-            },
-          };
-          hostWs.send(JSON.stringify(createMessage));
-        });
-
-        expect(connections).toHaveLength(maxConnections);
-        expect(lobbyId!).toBeDefined();
-      } finally {
-        connections.forEach((conn) => {
-          if (conn.readyState === WebSocket.OPEN) {
-            conn.close();
-          }
-        });
-      }
-    });
-  });
+  // ✅ SUPPRIMÉ: Test de performance déplacé vers loadTest.test.ts
+  // Évite la duplication avec les tests de performance dédiés
 
   describe("Error Handler Integration via WebSocket", () => {
     it("devrait déclencher errorHandler pour erreurs de validation WebSocket", async () => {

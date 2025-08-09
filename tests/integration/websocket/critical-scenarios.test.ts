@@ -445,47 +445,8 @@ describe("WebSocket Critical Scenarios Integration Tests", () => {
   });
 
   describe("Scénarios Critiques de Performance", () => {
-    it("devrait gérer les connexions multiples simultanées", async () => {
-      const maxConnections = 10;
-      const connections: WebSocket[] = [];
-      const startTime = Date.now();
-
-      try {
-        for (let i = 0; i < maxConnections; i++) {
-          const ws = new WebSocket(
-            `ws://localhost:${server.address().port}/ws`,
-            {
-              headers: { "x-user-id": `user-${i}` },
-            }
-          );
-
-          await new Promise<void>((resolve, reject) => {
-            ws.on("open", () => {
-              connections.push(ws);
-              resolve();
-            });
-            ws.on("error", reject);
-          });
-        }
-
-        const endTime = Date.now();
-        const connectionTime = endTime - startTime;
-
-        expect(connections).toHaveLength(maxConnections);
-        connections.forEach((conn) => {
-          expect(conn.readyState).toBe(WebSocket.OPEN);
-        });
-
-        // Vérifier que le temps de connexion est raisonnable
-        expect(connectionTime).toBeLessThan(5000); // 5 secondes max
-      } finally {
-        connections.forEach((conn) => {
-          if (conn.readyState === WebSocket.OPEN) {
-            conn.close();
-          }
-        });
-      }
-    });
+    // ✅ SUPPRIMÉ: Test de performance déplacé vers loadTest.test.ts
+    // Évite la duplication avec les tests de performance métier
 
     it("devrait gérer les messages en rafale", async () => {
       const ws = new WebSocket(`ws://localhost:${server.address().port}/ws`, {
