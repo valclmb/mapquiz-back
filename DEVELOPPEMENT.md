@@ -28,7 +28,7 @@ curl -L https://fly.io/install.sh | sh
 
 ```bash
 # Cloner le repository
-git clone <your-backend-repo>
+git clone https://github.com/map-quiz/mapquiz-back.git
 cd mapquiz-backend
 
 # Installer les dépendances

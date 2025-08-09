@@ -29,7 +29,7 @@ npm install
 
 ```bash
 # Copier le template de configuration
-cp env.template .env
+cp env.example .env
 # Éditer .env avec vos valeurs
 ```
 
@@ -173,4 +173,4 @@ src/
 - [Guide développement complet](./DEVELOPPEMENT.md)
 - [Protocole de déploiement](./DEPLOIEMENT.md)
 - [Schema Prisma](./prisma/schema.prisma)
-- [Frontend MapQuiz](https://github.com/your-username/mapquiz-frontend)
+- [Frontend MapQuiz](https://github.com/map-quiz/mapquiz-front)

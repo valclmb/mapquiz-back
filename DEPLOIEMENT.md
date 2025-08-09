@@ -7,12 +7,14 @@ Ce document décrit le protocole de déploiement continu pour le backend MapQuiz
 ## 🏗️ **Architecture de Déploiement**
 
 ### **Composants Backend**
+
 - **Application** : `backend-solitary-moon-1875.fly.dev`
 - **Base de données** : PostgreSQL (Fly.io Postgres)
 - **Runtime** : Node.js 22 dans conteneur Docker
 - **Plateforme** : Fly.io avec déploiement automatisé
 
 ### **Environnements**
+
 - **Production** : Branche `main` → Déploiement automatique
 - **Développement** : Branche `develop` → Tests automatiques
 - **Feature** : Branches de fonctionnalités → Tests PR
@@ -38,12 +40,14 @@ graph TD
 ### **Étapes Détaillées**
 
 1. **Tests Automatiques** (5-8 minutes)
+
    - Tests unitaires avec couverture > 80%
    - Tests d'intégration avec PostgreSQL
    - Tests de performance
    - Audit de sécurité npm
 
 2. **Build & Validation** (2-3 minutes)
+
    - Compilation TypeScript
    - Génération client Prisma
    - Validation des types
@@ -58,6 +62,7 @@ graph TD
 ## ⚙️ **Configuration Requise**
 
 ### **Variables d'Environnement Production**
+
 ```env
 # Base de données
 DATABASE_URL=postgresql://...fly.dev:5432/...
@@ -75,11 +80,12 @@ PORT=3000
 
 # GitHub Integration
 GITHUB_TOKEN=<github-personal-token>
-GITHUB_REPO_OWNER=<your-username>
-GITHUB_REPO_NAME=<backend-repo-name>
+GITHUB_REPO_OWNER=map-quiz
+GITHUB_REPO_NAME=mapquiz-back
 ```
 
 ### **Secrets GitHub Actions**
+
 - `FLY_API_TOKEN` - Token API Fly.io
 - `TEST_DB_PASSWORD` - Mot de passe DB test
 - `TEST_AUTH_SECRET` - Secret auth pour tests
@@ -89,6 +95,7 @@ GITHUB_REPO_NAME=<backend-repo-name>
 ## 🧪 **Gates de Qualité**
 
 ### **Critères Obligatoires**
+
 - ✅ **Couverture tests** : > 80%
 - ✅ **Audit sécurité** : 0 vulnérabilité critique
 - ✅ **Build TypeScript** : 0 erreur
@@ -96,6 +103,7 @@ GITHUB_REPO_NAME=<backend-repo-name>
 - ✅ **Linting** : 0 erreur ESLint
 
 ### **Seuils de Performance**
+
 - ⏱️ **Build time** : < 5 minutes
 - ⏱️ **Deploy time** : < 3 minutes
 - 🔍 **Health check** : Réponse < 30 secondes
@@ -104,6 +112,7 @@ GITHUB_REPO_NAME=<backend-repo-name>
 ## 🚀 **Déploiement Manuel**
 
 ### **Prérequis**
+
 ```bash
 # Installation Fly CLI
 curl -L https://fly.io/install.sh | sh
@@ -113,6 +122,7 @@ fly auth login
 ```
 
 ### **Commandes de Déploiement**
+
 ```bash
 # Déploiement standard
 fly deploy --remote-only
@@ -127,9 +137,11 @@ fly deploy --remote-only --no-release-command
 ## 🚨 **Procédures d'Urgence**
 
 ### **Rollback Automatique**
+
 En cas d'échec du health check, le déploiement est automatiquement annulé.
 
 ### **Rollback Manuel**
+
 ```bash
 # Lister les releases
 fly releases
@@ -142,6 +154,7 @@ fly releases rollback --force
 ```
 
 ### **Debug Production**
+
 ```bash
 # Logs en temps réel
 fly logs --tail
@@ -162,6 +175,7 @@ fly status --all
 ## 📋 **Checklist Pré-Déploiement**
 
 ### **Développeur**
+
 - [ ] Tests locaux passent (`npm run test`)
 - [ ] Branch à jour avec main
 - [ ] Migration DB testée localement
@@ -169,6 +183,7 @@ fly status --all
 - [ ] Documentation mise à jour
 
 ### **CI/CD Automatique**
+
 - [ ] Tous les tests passent
 - [ ] Build réussi sans erreur
 - [ ] Audit sécurité OK
@@ -187,21 +202,25 @@ fly status --all
 ## 🔧 **Outils et Composants**
 
 ### **Pipeline CI/CD**
+
 - **GitHub Actions** : Orchestration des tests et déploiements
 - **Fly.io** : Plateforme de déploiement et hébergement
 - **Docker** : Conteneurisation de l'application
 
 ### **Compilateur & Build**
+
 - **TypeScript** : Transpilation et vérification de types
 - **tsx** : Runtime de développement
 - **Prisma** : Génération du client et migrations
 
 ### **Base de Données**
+
 - **PostgreSQL** : Base de données principale
 - **Prisma Migrate** : Gestion des migrations
 - **Connection pooling** : Optimisation des connexions
 
 ### **Monitoring**
+
 - **Health endpoint** : `/health` avec status DB
 - **Fly.io metrics** : Monitoring intégré
 - **Application logs** : Via Fastify logger
@@ -209,12 +228,14 @@ fly status --all
 ## 📊 **Métriques de Performance**
 
 ### **Objectifs Production**
+
 - **Temps de réponse API** : < 200ms (P95)
 - **Disponibilité** : > 99.9%
 - **Temps de démarrage** : < 30 secondes
 - **Memory usage** : < 512MB stable
 
 ### **Surveillance Continue**
+
 - Health checks automatiques toutes les minutes
 - Alertes automatiques en cas de problème
 - Logs centralisés avec recherche
@@ -222,15 +243,18 @@ fly status --all
 ## 🚀 **Améliorations Futures**
 
 ### **Environnements Additionnels**
+
 - **Staging** : Environnement de pré-production
 - **Preview** : Environnements éphémères pour PR
 
 ### **Monitoring Avancé**
+
 - **APM Integration** : Sentry, DataDog, ou New Relic
 - **Métriques custom** : Business metrics
 - **Alerting** : Notifications Slack/Email
 
 ### **Performance**
+
 - **CDN** : Cache des assets statiques
 - **Database scaling** : Réplicas en lecture
 - **Caching** : Redis pour sessions/cache
