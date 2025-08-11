@@ -64,17 +64,24 @@ jest.setTimeout(30000); // 30 secondes par test
 const originalConsoleLog = console.log;
 const originalConsoleInfo = console.info;
 const originalConsoleWarn = console.warn;
+const originalConsoleError = console.error;
 
 beforeEach(() => {
-  console.log = jest.fn();
-  console.info = jest.fn();
-  console.warn = jest.fn();
+  // Supprimer les mocks pour permettre les logs de débogage
+  // console.log = jest.fn();
+  // console.info = jest.fn();
+  // console.warn = jest.fn();
+  // Mock console.error pour éviter la pollution des tests
+  console.error = jest.fn();
 });
 
 afterEach(() => {
-  console.log = originalConsoleLog;
-  console.info = originalConsoleInfo;
-  console.warn = originalConsoleWarn;
+  // Temporairement commenté pour voir les logs de débogage
+  // console.log = originalConsoleLog;
+  // console.info = originalConsoleInfo;
+  // console.warn = originalConsoleWarn;
+  // Restaurer console.error
+  console.error = originalConsoleError;
 });
 
 // Utilitaires pour les tests
@@ -84,14 +91,17 @@ export const testUtils = {
     id: string = "test-user-id",
     name: string = "Test User"
   ) {
+    const uniqueTag = `TAG${id.slice(-4)}${Date.now()}${Math.random()
+      .toString(36)
+      .substr(2, 3)}`;
     return await prisma.user.upsert({
       where: { id },
-      update: { name },
+      update: { name, tag: uniqueTag },
       create: {
         id,
         name,
         email: `${id}@test.com`,
-        tag: `TAG${id.slice(-4)}`,
+        tag: uniqueTag,
         emailVerified: false,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -139,8 +149,133 @@ export const testUtils = {
     return new Promise((resolve) => setTimeout(resolve, ms));
   },
 
+  // Utilitaires pour les nouveaux tests WebSocket sans mocks
+
+  // Trouver un lobby en base de données
+  async findLobbyInDB(lobbyId: string) {
+    return await prisma.gameLobby.findUnique({
+      where: { id: lobbyId },
+      include: {
+        host: true,
+        players: {
+          include: {
+            user: true,
+          },
+        },
+      },
+    });
+  },
+
+  // Mettre à jour le statut d'un lobby
+  async updateLobbyStatus(lobbyId: string, status: string) {
+    return await prisma.gameLobby.update({
+      where: { id: lobbyId },
+      data: { status },
+    });
+  },
+
+  // Ajouter un joueur à un lobby
+  async addPlayerToLobby(lobbyId: string, userId: string) {
+    return await prisma.lobbyPlayer.create({
+      data: {
+        lobbyId,
+        userId,
+        status: "joined",
+      },
+    });
+  },
+
+  // Obtenir les joueurs d'un lobby
+  async getLobbyPlayers(lobbyId: string) {
+    return await prisma.lobbyPlayer.findMany({
+      where: { lobbyId },
+      include: {
+        user: true,
+      },
+    });
+  },
+
+  // Obtenir le statut d'un joueur dans un lobby
+  async getPlayerStatus(lobbyId: string, userId: string) {
+    const player = await prisma.lobbyPlayer.findUnique({
+      where: {
+        lobbyId_userId: {
+          lobbyId,
+          userId,
+        },
+      },
+    });
+    return player?.status || null;
+  },
+
+  // Obtenir les données de jeu d'un joueur
+  async getPlayerGameData(lobbyId: string, userId: string) {
+    const player = await prisma.lobbyPlayer.findUnique({
+      where: {
+        lobbyId_userId: {
+          lobbyId,
+          userId,
+        },
+      },
+    });
+    return player
+      ? {
+          score: player.score || 0,
+          progress: player.progress || 0,
+          validatedCountries: player.validatedCountries || [],
+          incorrectCountries: player.incorrectCountries || [],
+        }
+      : null;
+  },
+
   // Générer un ID unique
   generateId() {
     return `test-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  },
+
+  // Nettoyer la base de données
+  async cleanDatabase() {
+    const tablenames = await prisma.$queryRaw<
+      Array<{ tablename: string }>
+    >`SELECT tablename FROM pg_tables WHERE schemaname='public'`;
+
+    const tables = tablenames
+      .map(({ tablename }) => tablename)
+      .filter((name) => name !== "_prisma_migrations")
+      .map((name) => `"public"."${name}"`)
+      .join(", ");
+
+    try {
+      await prisma.$executeRawUnsafe(`TRUNCATE TABLE ${tables} CASCADE;`);
+    } catch (error) {
+      console.log({ error });
+    }
+  },
+
+  async findPlayerInLobby(lobbyId: string, playerId: string) {
+    return await prisma.lobbyPlayer.findUnique({
+      where: {
+        lobbyId_userId: {
+          lobbyId,
+          userId: playerId,
+        },
+      },
+      include: {
+        user: {
+          select: { id: true, name: true },
+        },
+      },
+    });
+  },
+
+  async findPlayersInLobby(lobbyId: string) {
+    return await prisma.lobbyPlayer.findMany({
+      where: { lobbyId },
+      include: {
+        user: {
+          select: { id: true, name: true },
+        },
+      },
+    });
   },
 };

@@ -45,81 +45,116 @@ async function setupPlugins() {
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   });
 
-  // Limitation de débit
-  await fastify.register(rateLimit, {
-    max: 100,
-    timeWindow: "1 minute",
-  });
+  // Limitation de débit - Configuration différente selon l'environnement
+  if (process.env.NODE_ENV === "test") {
+    // Configuration très permissive pour les tests
+    await fastify.register(rateLimit, {
+      max: 10000, // Très permissif pour les tests
+      timeWindow: "1 minute",
+      allowList: ["127.0.0.1", "::1", "localhost"],
+      skipOnError: true,
+    });
+  } else if (process.env.NODE_ENV === "production") {
+    // Configuration stricte pour la production
+    await fastify.register(rateLimit, {
+      max: 100,
+      timeWindow: "1 minute",
+    });
+  } else {
+    // Configuration permissive pour le développement
+    await fastify.register(rateLimit, {
+      max: 1000,
+      timeWindow: "1 minute",
+      allowList: ["127.0.0.1", "::1", "localhost"],
+    });
+  }
 
   // Plugin WebSocket
   await fastify.register(websocket);
 }
 
-// Appliquer un rate limit très élevé en développement pour éviter les blocages
-if (process.env.NODE_ENV !== "production") {
-  await fastify.register(rateLimit, {
-    max: 1000, // très permissif pour le dev
-    timeWindow: "1 minute",
-    allowList: ["127.0.0.1", "::1"],
-  });
-}
+/**
+ * Configuration complète du serveur
+ */
+export const build = async () => {
+  // Configuration des plugins de sécurité et middleware
+  await setupPlugins();
 
-// Configuration des plugins de sécurité et middleware
-await setupPlugins();
-
-// Routes de base
-fastify.get("/", async (request, reply) => {
-  return {
-    message: "API Fastify + Prisma",
-    version: "1.0.0",
-    endpoints: {
-      api: "/api",
-      websocket: "/ws",
-      health: "/health",
-    },
-  };
-});
-
-fastify.get("/health", async (request, reply) => {
-  try {
-    await prisma.$queryRaw`SELECT 1`;
+  // Routes de base
+  fastify.get("/", async (request, reply) => {
     return {
-      status: "ok",
-      database: "connected",
-      timestamp: new Date().toISOString(),
+      message: "API Fastify + Prisma",
+      version: "1.0.0",
+      endpoints: {
+        api: "/api",
+        websocket: "/ws",
+        health: "/health",
+      },
     };
-  } catch (error) {
-    reply.status(503).send({
-      status: "error",
-      database: "disconnected",
-      timestamp: new Date().toISOString(),
+  });
+
+  fastify.get("/health", async (request, reply) => {
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+      return {
+        status: "ok",
+        database: "connected",
+        timestamp: new Date().toISOString(),
+      };
+    } catch (error) {
+      reply.status(503).send({
+        status: "error",
+        database: "disconnected",
+        timestamp: new Date().toISOString(),
+      });
+    }
+  });
+
+  // Enregistrement de toutes les routes API avec préfixe
+  await fastify.register(apiRoutes, { prefix: "/api" });
+
+  // Configuration des WebSockets
+  setupWebSocketHandlers(fastify);
+
+  // Gestionnaire d'erreur global
+  fastify.setErrorHandler(errorHandler);
+
+  return fastify;
+};
+
+/**
+ * Démarrage du serveur
+ */
+const start = async () => {
+  try {
+    const server = await build();
+
+    // Optimisations des hooks
+    server.addHook("onRequest", (req, reply, done) => {
+      // Désactiver les logs verbeux pour WebSocket
+      if (req.url === "/ws" && process.env.NODE_ENV === "production") {
+        req.log.info = () => {};
+        req.log.debug = () => {};
+      }
+      done();
     });
+
+    // Hook de performance monitoring
+    server.addHook("onResponse", (req, reply, done) => {
+      done();
+    });
+
+    // Démarrer le serveur
+    const port = process.env.PORT ? parseInt(process.env.PORT) : 3000;
+    const host = process.env.HOST || "0.0.0.0";
+
+    await server.listen({ port, host });
+    console.log(`🚀 Serveur démarré sur http://${host}:${port}`);
+  } catch (error) {
+    console.error("Erreur lors du démarrage du serveur:", error);
+    process.exit(1);
   }
-});
-
-// Enregistrement de toutes les routes API avec préfixe
-await fastify.register(apiRoutes, { prefix: "/api" });
-
-// Configuration des WebSockets
-setupWebSocketHandlers(fastify);
-
-// Gestionnaire d'erreur global
-fastify.setErrorHandler(errorHandler);
-
-// Optimisations des hooks
-fastify.addHook("onRequest", (req, reply, done) => {
-  // Désactiver les logs verbeux pour WebSocket
-  if (req.url === "/ws" && process.env.NODE_ENV === "production") {
-    req.log.info = () => {};
-    req.log.debug = () => {};
-  }
-  done();
-});
-
-// Hook de performance monitoring
-fastify.addHook("onResponse", (req, reply, done) => {
-  done();
-});
+};
 
 // Gestion gracieuse de l'arrêt
 const gracefulShutdown = async (signal: string) => {
@@ -152,34 +187,7 @@ process.on("uncaughtException", (error: Error) => {
   process.exit(1);
 });
 
-process.on("unhandledRejection", (reason: unknown, promise: Promise<unknown>) => {
-  console.error("Promesse rejetée non gérée", { reason, promise });
-});
-
-// Démarrage optimisé du serveur
-const start = async () => {
-  try {
-    const port = Number(process.env.PORT) || 3000;
-    const host = process.env.HOST || "0.0.0.0";
-
-    await fastify.listen({ port, host });
-
-    console.log("🚀 Serveur démarré avec succès", {
-      port,
-      host,
-      env: process.env.NODE_ENV || "development",
-      websocket: `ws://${host === "0.0.0.0" ? "localhost" : host}:${port}/ws`,
-      health: `http://${
-        host === "0.0.0.0" ? "localhost" : host
-      }:${port}/health`,
-    });
-  } catch (err) {
-    console.error("Erreur au démarrage du serveur", {
-      error: err instanceof Error ? err.message : "Unknown error",
-    });
-    process.exit(1);
-  }
-};
-
-// Lancement du serveur
-start();
+// Lancement du serveur seulement si pas en mode test
+if (process.env.NODE_ENV !== "test") {
+  start();
+}

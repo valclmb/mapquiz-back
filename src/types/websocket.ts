@@ -12,7 +12,6 @@ export const WS_MESSAGE_TYPES = {
   SET_PLAYER_READY: "set_player_ready",
   SET_PLAYER_ABSENT: "set_player_absent",
   START_GAME: "start_game",
-  UPDATE_GAME_PROGRESS: "update_game_progress",
   UPDATE_PLAYER_PROGRESS: "update_player_progress",
   GET_GAME_STATE: "get_game_state",
   GET_LOBBY_STATE: "get_lobby_state",

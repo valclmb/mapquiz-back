@@ -6,6 +6,18 @@ export async function requireAuth(
   reply: FastifyReply
 ) {
   try {
+    // En mode test, utiliser le header x-user-id pour simuler l'authentification
+    if (process.env.NODE_ENV === "test") {
+      const userId = request.headers["x-user-id"] as string;
+      if (userId) {
+        // Simuler un utilisateur pour les tests
+        (request as any).user = { id: userId };
+        return;
+      } else {
+        return reply.status(401).send({ error: "Non autorisé" });
+      }
+    }
+
     // Convert Fastify headers to standard Headers object
     const headers = new Headers();
     Object.entries(request.headers).forEach(([key, value]) => {
@@ -31,6 +43,16 @@ export async function optionalAuth(
   reply: FastifyReply
 ) {
   try {
+    // En mode test, utiliser le header x-user-id pour simuler l'authentification
+    if (process.env.NODE_ENV === "test") {
+      const userId = request.headers["x-user-id"] as string;
+      if (userId) {
+        // Simuler un utilisateur pour les tests
+        (request as any).user = { id: userId };
+        return;
+      }
+    }
+
     // Convert Fastify headers to standard Headers object
     const headers = new Headers();
     Object.entries(request.headers).forEach(([key, value]) => {

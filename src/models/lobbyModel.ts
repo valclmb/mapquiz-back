@@ -66,14 +66,27 @@ export const removePlayerFromLobby = async (
   lobbyId: string,
   userId: string
 ) => {
-  return await prisma.lobbyPlayer.delete({
-    where: {
-      lobbyId_userId: {
-        lobbyId,
-        userId,
+  try {
+    return await prisma.lobbyPlayer.delete({
+      where: {
+        lobbyId_userId: {
+          lobbyId,
+          userId,
+        },
       },
-    },
-  });
+    });
+  } catch (error) {
+    // Si le joueur n'existe pas, on considère que c'est OK
+    if (
+      error &&
+      typeof error === "object" &&
+      "code" in error &&
+      error.code === "P2025"
+    ) {
+      return null;
+    }
+    throw error;
+  }
 };
 
 // Mettre à jour le statut d'un joueur
@@ -82,15 +95,28 @@ export const updatePlayerStatus = async (
   userId: string,
   status: string
 ) => {
-  return await prisma.lobbyPlayer.update({
-    where: {
-      lobbyId_userId: {
-        lobbyId,
-        userId,
+  try {
+    return await prisma.lobbyPlayer.update({
+      where: {
+        lobbyId_userId: {
+          lobbyId,
+          userId,
+        },
       },
-    },
-    data: { status },
-  });
+      data: { status },
+    });
+  } catch (error) {
+    // Si le joueur n'existe pas, on considère que c'est OK
+    if (
+      error &&
+      typeof error === "object" &&
+      "code" in error &&
+      error.code === "P2025"
+    ) {
+      return null;
+    }
+    throw error;
+  }
 };
 
 // Mettre à jour les données de jeu d'un joueur
@@ -102,20 +128,33 @@ export const updatePlayerGameData = async (
   validatedCountries: string[],
   incorrectCountries: string[]
 ) => {
-  return await prisma.lobbyPlayer.update({
-    where: {
-      lobbyId_userId: {
-        lobbyId,
-        userId,
+  try {
+    return await prisma.lobbyPlayer.update({
+      where: {
+        lobbyId_userId: {
+          lobbyId,
+          userId,
+        },
       },
-    },
-    data: {
-      score,
-      progress,
-      validatedCountries,
-      incorrectCountries,
-    },
-  });
+      data: {
+        score,
+        progress,
+        validatedCountries,
+        incorrectCountries,
+      },
+    });
+  } catch (error) {
+    // Si le joueur n'existe pas, on considère que c'est OK
+    if (
+      error &&
+      typeof error === "object" &&
+      "code" in error &&
+      error.code === "P2025"
+    ) {
+      return null;
+    }
+    throw error;
+  }
 };
 
 // Mettre à jour les paramètres du lobby
@@ -247,12 +286,13 @@ export const addAuthorizedPlayer = async (lobbyId: string, userId: string) => {
   const authorizedPlayers = lobby.authorizedPlayers || [];
   if (!authorizedPlayers.includes(userId)) {
     authorizedPlayers.push(userId);
+    return await prisma.gameLobby.update({
+      where: { id: lobbyId },
+      data: { authorizedPlayers },
+    });
   }
 
-  return await prisma.gameLobby.update({
-    where: { id: lobbyId },
-    data: { authorizedPlayers },
-  });
+  return lobby;
 };
 
 /**

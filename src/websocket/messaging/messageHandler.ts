@@ -6,7 +6,6 @@ import {
   handleGetLobbyState,
   handleInviteToLobby,
   handleJoinLobby,
-  handleLeaveGame,
   handleLeaveLobby,
   handleRemovePlayer,
   handleRespondFriendRequest,
@@ -14,7 +13,6 @@ import {
   handleSendFriendRequest,
   handleSetPlayerReady,
   handleStartGame,
-  handleUpdateGameProgress,
   handleUpdateLobbySettings,
   handleUpdatePlayerProgress,
   handleUpdatePlayerStatus,
@@ -103,13 +101,6 @@ const messageHandlers = new Map<string, MessageHandler>([
 
   // Handlers pour le jeu
   [
-    WS_MESSAGE_TYPES.UPDATE_GAME_PROGRESS,
-    async (payload, userId) => {
-      return await handleUpdateGameProgress(payload, userId);
-    },
-  ],
-
-  [
     WS_MESSAGE_TYPES.UPDATE_PLAYER_PROGRESS,
     async (payload, userId) => {
       return await handleUpdatePlayerProgress(payload, userId);
@@ -141,13 +132,6 @@ const messageHandlers = new Map<string, MessageHandler>([
     WS_MESSAGE_TYPES.RESTART_GAME,
     async (payload, userId) => {
       return await handleRestartGame(payload, userId);
-    },
-  ],
-
-  [
-    WS_MESSAGE_TYPES.LEAVE_GAME,
-    async (payload, userId) => {
-      return await handleLeaveGame(payload, userId);
     },
   ],
 
@@ -192,11 +176,23 @@ export class WebSocketMessageHandler {
     socket: WebSocket,
     userId: string | null
   ): Promise<void> {
+    // Vérifier si le message est valide
+    if (!message || typeof message !== "object") {
+      sendErrorResponse(socket, "Message invalide");
+      return;
+    }
+
     const { type, payload } = message;
+
+    // Vérifier si le type est présent
+    if (!type || typeof type !== "string") {
+      sendErrorResponse(socket, "Type de message requis");
+      return;
+    }
 
     // Gestion spéciale pour le ping
     if (type === WS_MESSAGE_TYPES.PING) {
-      this.handlePing(socket);
+      WebSocketMessageHandler.handlePing(socket);
       return;
     }
 
@@ -216,31 +212,32 @@ export class WebSocketMessageHandler {
       // Exécuter le handler
       const result = await handler(payload, userId!, socket);
 
-      // Envoyer la réponse de succès
-      sendSuccessResponse(socket, result, `${type}_success`);
+      // Vérifier si le résultat indique un succès ou un échec
+      if (result && result.success === false) {
+        // Envoyer une réponse d'erreur avec plus de détails
+        const errorMessage = result.message || "Opération échouée";
+        sendErrorResponse(socket, errorMessage);
+      } else {
+        // Envoyer la réponse de succès
+        sendSuccessResponse(socket, result, `${type}_success`);
 
-      // Ajout du broadcast après la réponse de succès pour update_player_status
-      if (type === "update_player_status" && payload?.lobbyId) {
-        const lobby = LobbyLifecycleManager.getLobbyInMemory(payload.lobbyId);
-        if (lobby) {
-          await BroadcastManager.broadcastLobbyUpdate(payload.lobbyId, lobby);
+        // Ajout du broadcast après la réponse de succès pour update_player_status
+        if (type === "update_player_status" && payload?.lobbyId) {
+          const lobby = LobbyLifecycleManager.getLobbyInMemory(payload.lobbyId);
+          if (lobby) {
+            await BroadcastManager.broadcastLobbyUpdate(payload.lobbyId, lobby);
+          }
         }
-      }
-      // Ajout du broadcast après la réponse de succès pour join_lobby
-      if (type === "join_lobby" && payload?.lobbyId) {
-        console.log(
-          "🔍 Tentative de broadcast après join_lobby pour lobbyId:",
-          payload.lobbyId
-        );
-        const lobby = LobbyLifecycleManager.getLobbyInMemory(payload.lobbyId);
-        console.log("🔍 Lobby trouvé en mémoire:", lobby ? "oui" : "non");
-        if (lobby) {
-          console.log("🔍 Envoi du broadcastLobbyUpdate");
-          await BroadcastManager.broadcastLobbyUpdate(payload.lobbyId, lobby);
+        // Ajout du broadcast après la réponse de succès pour join_lobby
+        if (type === "join_lobby" && payload?.lobbyId) {
+          const lobby = LobbyLifecycleManager.getLobbyInMemory(payload.lobbyId);
+          if (lobby) {
+            await BroadcastManager.broadcastLobbyUpdate(payload.lobbyId, lobby);
+          }
         }
       }
     } catch (error) {
-      console.error(`Erreur lors du traitement du message ${type}:`, error);
+      console.error(`❌ Erreur lors du traitement du message ${type}:`, error);
       const errorMessage =
         error instanceof Error ? error.message : "Erreur inconnue";
       sendErrorResponse(socket, errorMessage);

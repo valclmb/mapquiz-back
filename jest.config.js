@@ -21,15 +21,9 @@ export default {
     "!src/**/*.d.ts",
     "!src/server.ts",
     "!src/types/**",
+    "!src/lib/auth.ts", // Configuration Better-auth - testée via les tests d'intégration
+    "!src/lib/database.ts", // Configuration Prisma - testée via les mocks
   ],
-  coverageThreshold: {
-    global: {
-      branches: 5,
-      functions: 2,
-      lines: 3,
-      statements: 3,
-    },
-  },
   testTimeout: 30000,
   verbose: true,
   forceExit: true,

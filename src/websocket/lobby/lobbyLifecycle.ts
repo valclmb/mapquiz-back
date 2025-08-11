@@ -24,9 +24,6 @@ export class LobbyLifecycleManager {
       try {
         await LobbyModel.deleteLobby(lobbyId);
         activeLobbies.delete(lobbyId);
-        console.log(
-          `Lobby ${lobbyId} supprimé après 3 minutes d'inactivité (vide)`
-        );
       } catch (e) {
         console.error(
           `Erreur lors de la suppression différée du lobby ${lobbyId}:`,
@@ -47,7 +44,6 @@ export class LobbyLifecycleManager {
     if (timer) {
       clearTimeout(timer);
       lobbyDeletionTimers.delete(lobbyId);
-      console.log(`Suppression différée annulée pour le lobby ${lobbyId}`);
     }
   }
 
@@ -60,10 +56,6 @@ export class LobbyLifecycleManager {
     hostName: string,
     settings: any
   ): { lobbyId: string; hostId: string; settings: any } {
-    console.log(
-      `Création du lobby ${lobbyId} en mémoire avec l'hôte ${hostId}`
-    );
-
     activeLobbies.set(lobbyId, {
       players: new Map([[hostId, PlayerService.createPlayer(hostName)]]),
       hostId: hostId,
@@ -79,7 +71,6 @@ export class LobbyLifecycleManager {
    * Supprime un lobby de la mémoire
    */
   static removeLobby(lobbyId: string): void {
-    console.log(`Suppression du lobby ${lobbyId} de la mémoire`);
     activeLobbies.delete(lobbyId);
   }
 
@@ -109,8 +100,6 @@ export class LobbyLifecycleManager {
       status: lobbyData.status,
       gameState: lobbyData.gameState,
     });
-
-    console.log(`Lobby ${lobbyId} restauré depuis la base de données`);
   }
 
   /**
@@ -118,16 +107,6 @@ export class LobbyLifecycleManager {
    */
   static getLobbyInMemory(lobbyId: string): any {
     const lobby = activeLobbies.get(lobbyId);
-    if (!lobby) {
-      // Log seulement si on a des lobbies actifs (évite le spam quand tout est vide)
-      const activeLobbyIds = Array.from(activeLobbies.keys());
-      if (activeLobbyIds.length > 0) {
-        console.log(
-          `Lobby ${lobbyId} non trouvé en mémoire. Lobbies actifs:`,
-          activeLobbyIds
-        );
-      }
-    }
     return lobby || null;
   }
 
