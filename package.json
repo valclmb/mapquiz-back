@@ -1,6 +1,6 @@
 {
   "name": "mapquiz-backend",
-  "version": "1.0.0",
+  "version": "0.0.9",
   "description": "Backend optimisé pour MapQuiz",
   "main": "dist/server.js",
   "type": "module",
